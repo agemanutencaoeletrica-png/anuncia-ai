@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7c3aed">
+<title>Anuncia Aí — divulgue o seu negócio nas redes</title>
+<meta name="description" content="Crie artes de promoção, novidade e antes e depois com a marca da sua empresa e poste no Instagram, Facebook, WhatsApp e Telegram em 1 minuto.">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .hero { background: linear-gradient(130deg, #7c3aed, #a855f7 60%, #f59e0b); color: #fff; padding: 56px 20px 64px; text-align: center; }
+  .hero h1 { font-size: clamp(30px, 6vw, 52px); font-weight: 900; letter-spacing: -1px; }
+  .hero h1 span { color: #fde68a; }
+  .hero p { font-size: 19px; max-width: 640px; margin: 14px auto 24px; opacity: .95; }
+  .hero .botao { font-size: 18px; padding: 14px 26px; }
+  .sec { max-width: 980px; margin: 0 auto; padding: 40px 16px 8px; }
+  .sec h2 { font-size: 28px; text-align: center; margin-bottom: 18px; }
+  .itens { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .item { background: var(--sup); border: 1px solid var(--borda); border-radius: 14px; padding: 16px; }
+  .item .ic { font-size: 30px; }
+  .exemplos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .exemplos canvas { width: 100%; border-radius: 14px; box-shadow: var(--sombra); }
+  .rodape { text-align: center; padding: 34px 16px; color: var(--mudo); font-size: 14px; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <h1>Anuncia <span>Aí</span></h1>
+  <p>Artes prontas com a <b>marca da sua empresa</b> para postar no Instagram, Facebook, WhatsApp, Telegram e TikTok. Sem saber design, em 1 minuto.</p>
+  <a class="botao dest" href="app.html">Testar 7 dias grátis</a>
+  <p style="font-size:14px;margin-top:12px">Sem cartão para testar · cancele quando quiser</p>
+</header>
+<section class="sec"><h2>Para qualquer negócio</h2><div class="exemplos" id="exemplos"></div></section>
+<section class="sec"><h2>Como funciona</h2><div class="itens">
+  <div class="item"><div class="ic">🏷️</div><h3>1. Sua marca</h3><p class="mudo">Coloque o logo, as cores, o WhatsApp e o Instagram uma vez só.</p></div>
+  <div class="item"><div class="ic">🎨</div><h3>2. Escolha o modelo</h3><p class="mudo">Promoção, novidade, antes e depois, serviços, aviso ou frase do dia.</p></div>
+  <div class="item"><div class="ic">✍️</div><h3>3. Legenda pronta</h3><p class="mudo">O app escreve a legenda com as hashtags do seu ramo e da sua cidade.</p></div>
+  <div class="item"><div class="ic">📤</div><h3>4. Poste</h3><p class="mudo">Um toque para mandar para o Instagram, Facebook, WhatsApp, Telegram ou TikTok.</p></div>
+</div></section>
+<section class="sec"><h2>Planos</h2><div class="planos" id="planos"><div class="item">Mensal · cobrança no cartão ou Pix</div></div>
+  <p class="mudo peq" style="text-align:center;margin-top:12px">Cartão: renova sozinho. Pix: você recebe o código 5 dias antes do vencimento.</p></section>
+<footer class="rodape" id="rodape">Anuncia Aí</footer>
+<script src="config.js"></script>
+<script src="comum.js"></script>
+<script src="artes.js"></script>
+<script>
+(function () {
+  var A = window.AN, R = window.AN_ARTES;
+  var ex = [
+    { modelo: "promocao", campos: { titulo: "Combo X-Burguer + batata", de: "39,90", por: "29,90", detalhe: "Só nesta sexta!" }, empresa: { nome: "Lanchonete do Zé", cor1: "#b91c1c", cor2: "#facc15", whatsapp: "(31) 99999-0000", cidade: "Contagem" } },
+    { modelo: "servico", campos: { titulo: "Elétrica e pintura", itens: "Instalações\nQuadros de energia\nPintura residencial", detalhe: "Orçamento grátis!" }, empresa: { nome: "AGE Elétrica e Pintura", cor1: "#14325c", cor2: "#f5b800", whatsapp: "(31) 98858-9772", cidade: "BH" } },
+    { modelo: "novidade", campos: { titulo: "Nova coleção de verão", texto: "Peças a partir de R$ 49" }, empresa: { nome: "Moda Bela", cor1: "#db2777", cor2: "#fde68a", instagram: "@modabela" } },
+    { modelo: "aviso", campos: { titulo: "Horário de funcionamento", texto: "Seg a sex: 8h às 19h\nSábado: 8h às 13h" }, empresa: { nome: "Pet Feliz", cor1: "#0f766e", cor2: "#fbbf24", whatsapp: "(31) 98888-7777" } }
+  ];
+  var box = document.getElementById("exemplos");
+  ex.forEach(function (d) { var cv = document.createElement("canvas"); R.desenhar(cv, Object.assign({ formato: "post", fotos: [] }, d)); box.appendChild(cv); });
+  if (A.CFG.SUPORTE_WHATSAPP) document.getElementById("rodape").innerHTML = 'Anuncia Aí · Dúvidas: <a target="_blank" rel="noopener" href="' + A.esc(A.linkZap(A.CFG.SUPORTE_WHATSAPP, "Olá! Quero saber mais do Anuncia Aí.")) + '">WhatsApp ' + A.esc(A.CFG.SUPORTE_WHATSAPP) + "</a>";
+  if (A.configurado()) {
+    fetch(A.CFG.SUPABASE_URL + "/rest/v1/planos?select=*&ativo=eq.true&order=ordem", { headers: { apikey: A.CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + A.CFG.SUPABASE_ANON_KEY } })
+      .then(function (r) { return r.json(); }).then(function (ps) {
+        if (!Array.isArray(ps) || !ps.length) return;
+        document.getElementById("planos").innerHTML = ps.map(function (p) {
+          return '<div class="plano"><div class="forte">' + A.esc(p.nome) + '</div><div class="preco">' + A.dinheiro(p.preco) + '</div><div class="mudo peq">' +
+            (p.meses === 1 ? "por mês" : "a cada " + p.meses + " meses (" + A.dinheiro(p.preco / p.meses) + "/mês)") + '</div><div class="acoes"><a class="botao prim" href="app.html">Começar grátis</a></div></div>';
+        }).join("");
+      }).catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>
