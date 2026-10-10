@@ -1,5 +1,5 @@
 // Anuncia Aí — função "mp-webhook" (Supabase Edge Function)
-// O Mercado Pago chama este endereço quando um pagamento muda (Pix pago, cobrança do
+// O Mercado Pago chama este endereço quando um pagamento muda (Pix pago — evento "order" —, cobrança do
 // cartão aprovada, assinatura cancelada...). A função NÃO confia no que chega: busca o
 // pagamento direto no Mercado Pago com o seu token e só então libera o acesso.
 // Configuração em "Verify JWT": DESLIGADO (quem chama é o Mercado Pago).
@@ -34,12 +34,15 @@ async function assinaturaOk(req: Request, dataId: string) {
   const partes: Record<string, string> = {};
   sig.split(",").forEach((p) => { const [k, v] = p.split("=").map((x) => (x || "").trim()); if (k) partes[k] = v; });
   if (!partes.ts || !partes.v1) return false;
-  const id = /^[a-z0-9]+$/i.test(dataId) ? dataId.toLowerCase() : dataId;
-  const manifesto = "id:" + id + ";request-id:" + reqId + ";ts:" + partes.ts + ";";
   const chave = await crypto.subtle.importKey("raw", new TextEncoder().encode(segredo), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", chave, new TextEncoder().encode(manifesto)));
-  const hex = Array.from(mac).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return hex === partes.v1;
+  // a documentação manda usar o id em minúsculas; há relatos de pedidos (ORD...) assinados como vieram — aceita os dois
+  for (const id of new Set([dataId.toLowerCase(), dataId])) {
+    const manifesto = "id:" + id + ";request-id:" + reqId + ";ts:" + partes.ts + ";";
+    const mac = new Uint8Array(await crypto.subtle.sign("HMAC", chave, new TextEncoder().encode(manifesto)));
+    const hex = Array.from(mac).map((b) => b.toString(16).padStart(2, "0")).join("");
+    if (hex === partes.v1) return true;
+  }
+  return false;
 }
 
 async function empresaPor(ref: string | null, assinatura: string | null) {
@@ -69,7 +72,20 @@ async function registrarPagamento(p: any, empresa: any, tipo: string) {
   return { mpId, status: p.status, aplicado: true };
 }
 
+// pedido (Order) do Pix -> mesmo formato de pagamento usado no resto da função
+function pagamentoDoPedido(o: any) {
+  const pago = o.status === "processed" && (!o.status_detail || o.status_detail === "accredited");
+  const st = pago ? "approved" : o.status === "refunded" ? "refunded" : (o.status === "canceled" || o.status === "expired" || o.status === "failed") ? "cancelled" : "pending";
+  return { id: o.id, status: st, transaction_amount: o.total_paid_amount || o.total_amount, date_approved: pago ? (o.last_updated_date || null) : null };
+}
+
 export async function processar(tipo: string, id: string) {
+  if (tipo === "order") {
+    const o = await mp("/v1/orders/" + encodeURIComponent(id));
+    const empresa = await empresaPor(o.external_reference || null, null);
+    if (!empresa) return { ignorado: "empresa não encontrada", id };
+    return await registrarPagamento(pagamentoDoPedido(o), empresa, "pix");
+  }
   if (tipo === "payment") {
     const p = await mp("/v1/payments/" + encodeURIComponent(id));
     const assin = (p.metadata && (p.metadata.preapproval_id || p.metadata.subscription_id)) || (p.point_of_interaction && p.point_of_interaction.transaction_data && p.point_of_interaction.transaction_data.subscription_id) || null;
