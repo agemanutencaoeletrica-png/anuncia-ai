@@ -5,8 +5,8 @@
 // NUNCA coloque aqui a chave "service_role" nem o token do Mercado Pago.
 // =====================================================================
 window.ANUNCIA_CONFIG = {
-  SUPABASE_URL: "",        // ex.: "https://abcdxyz.supabase.co"
-  SUPABASE_ANON_KEY: "",   // chave pública (publishable / anon)
+  SUPABASE_URL: "https://ryxwocuhhrohikaqddvy.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_4Ds5DpzjBfyaAbT0Lwca4g_9gbx7bdD", // chave pública (publishable)
 
   // Seu contato de suporte (aparece no app e no site)
   SUPORTE_WHATSAPP: "(31) 98858-9772",
