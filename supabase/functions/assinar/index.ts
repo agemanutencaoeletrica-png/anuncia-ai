@@ -6,6 +6,12 @@
 // Configuração em "Verify JWT": DESLIGADO (a própria função confere o login).
 
 const env = (k: string) => (globalThis as any).Deno ? (globalThis as any).Deno.env.get(k) : (globalThis as any).process?.env?.[k];
+// chave de servidor: a antiga (service_role) ou, se ela não existir, a nova (sb_secret_...)
+function chaveServidor() {
+  const antiga = env("SUPABASE_SERVICE_ROLE_KEY");
+  if (antiga) return antiga;
+  try { const k = JSON.parse(env("SUPABASE_SECRET_KEYS") || "{}"); return k.default || Object.values(k)[0] || ""; } catch { return ""; }
+}
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -19,7 +25,7 @@ async function db(caminho: string, op: any = {}) {
   const r = await fetch(env("SUPABASE_URL") + "/rest/v1/" + caminho, {
     method: op.method || "GET",
     headers: {
-      apikey: env("SUPABASE_SERVICE_ROLE_KEY"), Authorization: "Bearer " + env("SUPABASE_SERVICE_ROLE_KEY"),
+      apikey: chaveServidor(), Authorization: "Bearer " + chaveServidor(),
       "Content-Type": "application/json", Prefer: op.prefer || "return=representation",
     },
     body: op.body === undefined ? undefined : JSON.stringify(op.body),
@@ -47,7 +53,7 @@ async function mp(caminho: string, op: any = {}) {
 async function usuarioLogado(req: Request) {
   const auth = req.headers.get("Authorization") || "";
   if (!auth.startsWith("Bearer ")) return null;
-  const r = await fetch(env("SUPABASE_URL") + "/auth/v1/user", { headers: { apikey: env("SUPABASE_SERVICE_ROLE_KEY"), Authorization: auth } });
+  const r = await fetch(env("SUPABASE_URL") + "/auth/v1/user", { headers: { apikey: chaveServidor(), Authorization: auth } });
   if (!r.ok) return null;
   return await r.json();
 }

@@ -7,6 +7,12 @@
 // Configuração em "Verify JWT": DESLIGADO (protegida pelo CRON_SECRET).
 
 const env = (k: string) => (globalThis as any).Deno ? (globalThis as any).Deno.env.get(k) : (globalThis as any).process?.env?.[k];
+// chave de servidor: a antiga (service_role) ou, se ela não existir, a nova (sb_secret_...)
+function chaveServidor() {
+  const antiga = env("SUPABASE_SERVICE_ROLE_KEY");
+  if (antiga) return antiga;
+  try { const k = JSON.parse(env("SUPABASE_SECRET_KEYS") || "{}"); return k.default || Object.values(k)[0] || ""; } catch { return ""; }
+}
 const DIA = 24 * 3600 * 1000;
 // cartão: o Mercado Pago cobra no dia do vencimento e tenta de novo se falhar; espera 3 dias antes de bloquear
 export const CARENCIA_CARTAO_DIAS = 3;
@@ -16,7 +22,7 @@ async function db(caminho: string, op: any = {}) {
   const r = await fetch(env("SUPABASE_URL") + "/rest/v1/" + caminho, {
     method: op.method || "GET",
     headers: {
-      apikey: env("SUPABASE_SERVICE_ROLE_KEY"), Authorization: "Bearer " + env("SUPABASE_SERVICE_ROLE_KEY"),
+      apikey: chaveServidor(), Authorization: "Bearer " + chaveServidor(),
       "Content-Type": "application/json", Prefer: op.prefer || "return=representation",
     },
     body: op.body === undefined ? undefined : JSON.stringify(op.body),
