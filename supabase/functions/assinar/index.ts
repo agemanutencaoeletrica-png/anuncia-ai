@@ -1,7 +1,7 @@
 // Anuncia Aí — função "assinar" (Supabase Edge Function)
 // Cria a cobrança no Mercado Pago:
 //   * cartão: assinatura que cobra sozinha todo mês (ou a cada 12 meses no plano anual);
-//   * Pix: gera o QR e o "copia e cola" (vale 3 dias). Se já existe um Pix em aberto, devolve o mesmo.
+//   * Pix: gera o QR e o "copia e cola" pela API de Orders (vale 3 dias). Se já existe um Pix em aberto, devolve o mesmo.
 // Quem chama: o app (empresa logada) ou a função "cobranca-diaria" (com o CRON_SECRET).
 // Configuração em "Verify JWT": DESLIGADO (a própria função confere o login).
 
@@ -40,7 +40,7 @@ async function mp(caminho: string, op: any = {}) {
   });
   const t = await r.text();
   const j = t ? JSON.parse(t) : {};
-  if (!r.ok) throw new Error("Mercado Pago: " + (j.message || r.status));
+  if (!r.ok) throw new Error("Mercado Pago: " + (j.message || (j.errors && j.errors[0] && (j.errors[0].message || j.errors[0].code)) || r.status));
   return j;
 }
 
@@ -52,8 +52,6 @@ async function usuarioLogado(req: Request) {
   return await r.json();
 }
 
-function urlFuncoes() { return env("SUPABASE_URL") + "/functions/v1"; }
-
 export async function criarPix(empresa: any, plano: any) {
   const agora = Date.now();
   const abertos = await db("pagamentos?select=*&empresa_id=eq." + empresa.id + "&tipo=eq.pix&status=eq.pending&order=criado_em.desc&limit=1");
@@ -62,21 +60,25 @@ export async function criarPix(empresa: any, plano: any) {
     return { copia: a.pix_copia, qr: a.pix_qr, link: a.pix_link, vence_em: a.vence_em, valor: Number(a.valor) };
   }
   const vence = new Date(agora + 3 * 24 * 3600 * 1000);
-  const p = await mp("/v1/payments", {
+  const valor = Number(plano.preco).toFixed(2);
+  // Pix pela API de Orders do Mercado Pago (a API de Payments será descontinuada).
+  // O aviso de pagamento chega pelo webhook configurado no painel (evento "Order").
+  const o = await mp("/v1/orders", {
     method: "POST", idem: crypto.randomUUID(),
     body: {
-      transaction_amount: Number(plano.preco), description: "Anuncia Aí — " + plano.nome + " — " + empresa.nome,
-      payment_method_id: "pix", payer: { email: empresa.email }, external_reference: empresa.id,
-      notification_url: urlFuncoes() + "/mp-webhook", date_of_expiration: vence.toISOString().replace("Z", "-00:00"),
+      type: "online", processing_mode: "automatic", total_amount: valor, external_reference: empresa.id,
+      payer: { email: empresa.email },
+      transactions: { payments: [{ amount: valor, payment_method: { id: "pix", type: "bank_transfer" }, expiration_time: "P3D" }] },
     },
   });
-  const td = (p.point_of_interaction && p.point_of_interaction.transaction_data) || {};
+  const pg = (o.transactions && o.transactions.payments && o.transactions.payments[0]) || {};
+  const pm = pg.payment_method || {};
   await db("pagamentos", {
     method: "POST", prefer: "return=minimal,resolution=ignore-duplicates",
-    body: { empresa_id: empresa.id, mp_id: String(p.id), tipo: "pix", plano: plano.id, valor: Number(plano.preco), status: p.status || "pending",
-      pix_copia: td.qr_code || null, pix_qr: td.qr_code_base64 || null, pix_link: td.ticket_url || null, vence_em: vence.toISOString() },
+    body: { empresa_id: empresa.id, mp_id: String(o.id), tipo: "pix", plano: plano.id, valor: Number(plano.preco), status: "pending",
+      pix_copia: pm.qr_code || null, pix_qr: pm.qr_code_base64 || null, pix_link: pm.ticket_url || null, vence_em: vence.toISOString() },
   });
-  return { copia: td.qr_code, qr: td.qr_code_base64, link: td.ticket_url, vence_em: vence.toISOString(), valor: Number(plano.preco) };
+  return { copia: pm.qr_code, qr: pm.qr_code_base64, link: pm.ticket_url, vence_em: vence.toISOString(), valor: Number(plano.preco) };
 }
 
 export async function criarAssinaturaCartao(empresa: any, plano: any) {

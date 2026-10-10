@@ -44,11 +44,12 @@ O Mercado Pago cobra a taxa dele sobre cada pagamento recebido.
 
 ### 2. Mercado Pago
 1. Crie/entre na conta em <https://www.mercadopago.com.br> (de preferência conta de empresa).
-2. <https://www.mercadopago.com.br/developers/panel/app> → **Criar aplicação** → produto **Pagamentos on-line** e **Assinaturas**.
+2. <https://www.mercadopago.com.br/developers/panel/app> → **Criar aplicação** → **Criar no painel de integração** →
+   **Checkout Transparente** → Tipo de API **API de Orders** (o Pix é gerado por ela; a assinatura no cartão usa o mesmo token).
 3. Em **Credenciais de produção**, copie o **Access Token** (começa com `APP_USR-`). Ele vai nos segredos do Supabase (passo 5), **nunca** no `config.js`.
-4. Em **Webhooks / Notificações**: URL `https://SEU-PROJETO.supabase.co/functions/v1/mp-webhook`, eventos
-   **Pagamentos** e **Planos e assinaturas**. Copie a **assinatura secreta** (para o `MP_WEBHOOK_SECRET`).
-5. Para testar sem dinheiro de verdade, use as **credenciais de teste** e os usuários de teste do Mercado Pago.
+4. Em **Webhooks → Configurar notificações**: URL `https://SEU-PROJETO.supabase.co/functions/v1/mp-webhook`, eventos
+   **Order (Mercado Pago)** (Pix), **Pagamentos** e **Planos e assinaturas** (cartão). Copie a **assinatura secreta** (para o `MP_WEBHOOK_SECRET`).
+5. Para testar sem dinheiro de verdade, use as **credenciais de teste** (o token de teste também começa com `APP_USR-`).
 
 ### 3. Funções do servidor (Supabase → Edge Functions)
 Crie 3 funções (**Deploy a new function → Via Editor**), colando o arquivo `index.ts` de cada pasta:
