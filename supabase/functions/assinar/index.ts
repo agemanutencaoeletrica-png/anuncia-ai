@@ -61,7 +61,9 @@ async function usuarioLogado(req: Request) {
 export async function criarPix(empresa: any, plano: any) {
   const agora = Date.now();
   const abertos = await db("pagamentos?select=*&empresa_id=eq." + empresa.id + "&tipo=eq.pix&status=eq.pending&order=criado_em.desc&limit=1");
-  const a = abertos && abertos[0];
+  // MP_PIX_TESTE=1 (só no ambiente de teste): o Mercado Pago aprova o Pix sozinho (pagador "APRO") e não reaproveita o Pix aberto
+  const teste = env("MP_PIX_TESTE") === "1";
+  const a = !teste && abertos && abertos[0];
   if (a && a.pix_copia && a.vence_em && new Date(a.vence_em).getTime() - agora > 6 * 3600 * 1000 && a.plano === plano.id) {
     return { copia: a.pix_copia, qr: a.pix_qr, link: a.pix_link, vence_em: a.vence_em, valor: Number(a.valor) };
   }
@@ -73,7 +75,7 @@ export async function criarPix(empresa: any, plano: any) {
     method: "POST", idem: crypto.randomUUID(),
     body: {
       type: "online", processing_mode: "automatic", total_amount: valor, external_reference: empresa.id,
-      payer: { email: empresa.email },
+      payer: teste ? { email: empresa.email, first_name: "APRO" } : { email: empresa.email },
       transactions: { payments: [{ amount: valor, payment_method: { id: "pix", type: "bank_transfer" }, expiration_time: "P3D" }] },
     },
   });

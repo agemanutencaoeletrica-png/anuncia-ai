@@ -74,6 +74,7 @@ Crie 3 funções (**Deploy a new function → Via Editor**), colando o arquivo `
 | `BREVO_API_KEY` | chave da API do Brevo |
 | `EMAIL_FROM` | o e-mail remetente confirmado no Brevo |
 | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_TEMPLATE` | opcional — ver passo 7 |
+| `MP_PIX_TESTE` | `1` **só durante o teste** com credenciais de teste: o Mercado Pago aprova o Pix sozinho. **Apague antes de usar o token de produção.** |
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` o Supabase já coloca sozinho.
 
