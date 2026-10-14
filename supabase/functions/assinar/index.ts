@@ -81,12 +81,44 @@ export async function criarPix(empresa: any, plano: any) {
   });
   const pg = (o.transactions && o.transactions.payments && o.transactions.payments[0]) || {};
   const pm = pg.payment_method || {};
+  const st = statusDoPedido(o);
   await db("pagamentos", {
     method: "POST", prefer: "return=minimal,resolution=ignore-duplicates",
-    body: { empresa_id: empresa.id, mp_id: String(o.id), tipo: "pix", plano: plano.id, valor: Number(plano.preco), status: "pending",
+    body: { empresa_id: empresa.id, mp_id: String(o.id), tipo: "pix", plano: plano.id, valor: Number(plano.preco), status: st,
+      pago_em: st === "approved" ? new Date().toISOString() : null,
       pix_copia: pm.qr_code || null, pix_qr: pm.qr_code_base64 || null, pix_link: pm.ticket_url || null, vence_em: vence.toISOString() },
   });
-  return { copia: pm.qr_code, qr: pm.qr_code_base64, link: pm.ticket_url, vence_em: vence.toISOString(), valor: Number(plano.preco) };
+  if (st === "approved") await aplicar(String(o.id), empresa);
+  return { copia: pm.qr_code, qr: pm.qr_code_base64, link: pm.ticket_url, vence_em: vence.toISOString(), valor: Number(plano.preco),
+    situacao: st, detalhe: [o.status, o.status_detail].filter(Boolean).join(" / ") };
+}
+
+// situação do pedido (Order) do Mercado Pago no formato da tabela pagamentos
+function statusDoPedido(o: any) {
+  if (o.status === "processed" && (!o.status_detail || o.status_detail === "accredited")) return "approved";
+  if (o.status === "refunded") return "refunded";
+  if (o.status === "canceled" || o.status === "expired" || o.status === "failed") return "cancelled";
+  return "pending";
+}
+async function aplicar(mpId: string, empresa: any) {
+  await db("rpc/aplicar_pagamento", { method: "POST", body: { p_mp_id: mpId } });
+  await db("empresas?id=eq." + empresa.id, { method: "PATCH", prefer: "return=minimal", body: { metodo: empresa.metodo || "pix" } });
+}
+
+// confere no Mercado Pago os Pix em aberto da empresa (não depende só do aviso do webhook)
+export async function verificarPix(empresa: any) {
+  const abertos = await db("pagamentos?select=mp_id&empresa_id=eq." + empresa.id + "&tipo=eq.pix&status=eq.pending&mp_id=like.ORD*&order=criado_em.desc&limit=5");
+  const res: any[] = [];
+  for (const a of abertos || []) {
+    const o = await mp("/v1/orders/" + encodeURIComponent(a.mp_id));
+    const st = statusDoPedido(o);
+    res.push({ id: a.mp_id, situacao: st, detalhe: [o.status, o.status_detail].filter(Boolean).join(" / ") });
+    if (st === "pending") continue;
+    await db("pagamentos?mp_id=eq." + encodeURIComponent(a.mp_id), { method: "PATCH", prefer: "return=minimal",
+      body: { status: st, pago_em: st === "approved" ? (o.last_updated_date || new Date().toISOString()) : null } });
+    if (st === "approved") await aplicar(a.mp_id, empresa);
+  }
+  return { liberado: res.some((r) => r.situacao === "approved"), pedidos: res };
 }
 
 export async function criarAssinaturaCartao(empresa: any, plano: any) {
@@ -122,6 +154,7 @@ export async function handler(req: Request): Promise<Response> {
     if (!plano) return resposta({ erro: "Plano não encontrado." }, 400);
     if (corpo.metodo === "cartao") return resposta(await criarAssinaturaCartao(empresa, plano));
     if (corpo.metodo === "pix") return resposta({ pix: await criarPix(empresa, plano) });
+    if (corpo.metodo === "verificar") return resposta(await verificarPix(empresa));
     return resposta({ erro: "Escolha cartão ou Pix." }, 400);
   } catch (e) {
     console.error(e);
