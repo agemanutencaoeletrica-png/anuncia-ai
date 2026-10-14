@@ -94,6 +94,9 @@ export async function processar(tipo: string, id: string) {
   }
   if (tipo === "payment") {
     const p = await mp("/v1/payments/" + encodeURIComponent(id));
+    // o Pix é criado como pedido (Order) e já é contado pelo aviso "order"; o pagamento interno
+    // desse pedido também chega aqui como "payment" — contar de novo somaria o mês duas vezes
+    if (p.payment_method_id === "pix" || (p.order && p.order.id)) return { ignorado: "pagamento de pedido (contado pelo aviso order)", id };
     const assin = (p.metadata && (p.metadata.preapproval_id || p.metadata.subscription_id)) || (p.point_of_interaction && p.point_of_interaction.transaction_data && p.point_of_interaction.transaction_data.subscription_id) || null;
     const empresa = await empresaPor(p.external_reference || null, assin);
     if (!empresa) return { ignorado: "empresa não encontrada", id };
