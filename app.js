@@ -283,6 +283,7 @@
           (p.qr ? '<img class="pix-qr" alt="QR Code do Pix" src="data:image/png;base64,' + esc(p.qr) + '">' : "") +
           '<p class="peq mudo">Abra o app do seu banco, escolha Pix e leia o QR, ou use o copia e cola:</p><div class="copia" id="as-copia">' + esc(p.copia || "") + "</div>" +
           '<div class="acoes"><button class="prim" id="as-copiar">📋 Copiar código Pix</button>' + (p.link ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(p.link) + '">Abrir no Mercado Pago</a>' : "") + "</div>" +
+          (!p.copia && p.situacao !== "approved" ? '<div class="aviso erro">O Mercado Pago não devolveu o código do Pix' + (p.detalhe ? " (" + esc(p.detalhe) + ")" : "") + ". Tente de novo ou fale com o suporte.</div>" : "") +
           '<p class="peq" id="as-espera"><span class="carregando"></span> Aguardando o pagamento... (válido até ' + A.dataHora(p.vence_em) + ")</p></div>";
         $("#as-copiar").onclick = function () { A.copiar(p.copia || "", "Código Pix copiado. Cole no app do banco."); };
         esperarPagamento();
@@ -302,6 +303,8 @@
     var antes = new Date(E.valido_ate).getTime(), voltas = 0;
     vigiaPix = setInterval(function () {
       if (++voltas > 240) { clearInterval(vigiaPix); vigiaPix = null; return; }
+      // a cada 15 s pede ao servidor para conferir o Pix direto no Mercado Pago
+      if (voltas % 3 === 1) A.funcao(sb, "assinar", { metodo: "verificar" }).catch(function () {});
       q(sb.from("empresas").select("*").eq("id", E.id).single()).then(function (n) {
         if (new Date(n.valido_ate).getTime() > antes && n.status === "ativa") {
           clearInterval(vigiaPix); vigiaPix = null; E = n;
