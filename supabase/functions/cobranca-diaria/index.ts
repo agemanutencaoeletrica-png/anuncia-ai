@@ -137,8 +137,8 @@ async function marcar(id: string, ok: boolean, erro: string | null) {
   await db("avisos?id=eq." + id, { method: "PATCH", prefer: "return=minimal", body: { ok, erro } });
 }
 
-async function gerarPix(e: any) {
-  if (cartaoAtivo(e) && new Date(e.valido_ate).getTime() > Date.now()) return null;
+async function gerarPix(e: any, agora: Date) {
+  if (cartaoAtivo(e) && new Date(e.valido_ate).getTime() > agora.getTime()) return null;
   try {
     const r = await fetch(env("SUPABASE_URL") + "/functions/v1/assinar", {
       method: "POST", headers: { Authorization: "Bearer " + env("CRON_SECRET"), "Content-Type": "application/json" },
@@ -166,7 +166,7 @@ export async function rodar(agora = new Date()) {
       for (const canal of ["email", "whatsapp"]) {
         const id = await reservar(e, d.tipo, canal);
         if (!id) continue;
-        if (pix === undefined) pix = await gerarPix(e);
+        if (pix === undefined) pix = await gerarPix(e, agora);
         const m = mensagem(e, d, pix);
         try {
           const r: any = canal === "email" ? await enviarEmail(e, m) : await enviarWhats(e, m, d);
