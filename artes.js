@@ -161,7 +161,8 @@
       if (c.detalhe) texto(cx, c.detalhe, P, y, larg, { tam: 44, min: 28, linhas: 2, peso: "700", cor: txt });
     } else if (d.modelo === "divulgar") {
       if (c.selo) { pilula(cx, c.selo, P, y, cor2, luz(cor2) > 0.6 ? "#1d1830" : "#fff", 42); y += 100; }
-      var adv = Math.round((fimArea - y) * 0.5);
+      // a foto ocupa o que sobra depois de reservar espaço para os textos (no story sobra mais)
+      var adv = Math.round(Math.max((fimArea - y) * 0.5, fimArea - y - 520));
       cobrir(cx, d.fotos && d.fotos[0], P, y, larg, adv); y += adv + 30;
       y += texto(cx, c.titulo, P, y, larg, { tam: 76, min: 40, linhas: 2, cor: txt }) + 10;
       if (c.texto) y += texto(cx, c.texto, P, y, larg, { tam: 44, min: 28, linhas: 2, peso: "600", cor: txt2 }) + 20;
