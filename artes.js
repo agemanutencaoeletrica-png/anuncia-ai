@@ -150,7 +150,8 @@
 
     if (d.modelo === "promocao") {
       if (c.selo !== "") { pilula(cx, c.selo || "PROMOÇÃO", P, y, cor2, luz(cor2) > 0.6 ? "#1d1830" : "#fff", 42); y += 100; }
-      var altFoto = Math.round((fimArea - y) * 0.52);
+      // sem preço, a foto ganha o espaço que ele ocuparia
+      var altFoto = Math.round((fimArea - y) * (c.por ? 0.52 : 0.64));
       cobrir(cx, d.fotos && d.fotos[0], P, y, larg, altFoto); y += altFoto + 30;
       y += texto(cx, c.titulo, P, y, larg, { tam: 70, min: 40, linhas: 2, cor: txt }) + 10;
       if (c.de) { cx.font = "700 46px system-ui, Arial"; cx.fillStyle = txt2; var t1 = "De " + preco(c.de); cx.fillText(t1, P, y); var w1 = cx.measureText(t1).width;
@@ -214,7 +215,7 @@
     var tags = tagsRamo(e.ramo) + (e.cidade ? " #" + String(e.cidade).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase() : "");
     var contato = [e.whatsapp ? "📲 WhatsApp: " + e.whatsapp : "", e.cidade ? "📍 " + e.cidade : ""].filter(Boolean).join("\n");
     var t;
-    if (modelo === "promocao") t = "🔥 PROMOÇÃO: " + (c.titulo || "") + (c.por ? "\n" + (ehValor(c.por) ? (c.de ? "De " + preco(c.de) + " por " : "Por ") + preco(c.por) + "!" : (c.de ? "De " + preco(c.de) + " · " : "") + c.por) : "") + (c.detalhe ? "\n" + c.detalhe : "");
+    if (modelo === "promocao") t = (c.selo === "" ? "" : "🔥 " + String(c.selo || "PROMOÇÃO").toUpperCase() + ": ") + (c.titulo || "") + (c.por ? "\n" + (ehValor(c.por) ? (c.de ? "De " + preco(c.de) + " por " : "Por ") + preco(c.por) + "!" : (c.de ? "De " + preco(c.de) + " · " : "") + c.por) : "") + (c.detalhe ? "\n" + c.detalhe : "");
     else if (modelo === "divulgar") t = "📣 " + (c.titulo || "") + (c.texto ? "\n" + c.texto : "") + (c.selo ? "\n✅ " + c.selo : "") + (c.detalhe ? "\n👉 " + c.detalhe : "");
     else if (modelo === "novidade") t = "✨ " + (c.titulo || "Novidade!") + "\n" + (c.texto || "");
     else if (modelo === "antes_depois") t = "🔁 Antes e depois: " + (c.titulo || "") + "\nArraste para o lado e veja a diferença! 😍";
