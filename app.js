@@ -76,7 +76,12 @@
   // ---------- dados ----------
   function carregar() {
     app.innerHTML = '<div class="vazio"><span class="carregando"></span> Carregando...</div>';
-    return Promise.all([q(sb.from("empresas").select("*").limit(1)), q(sb.from("planos").select("*").eq("ativo", true).order("ordem"))]).then(function (r) {
+    // filtra pelo dono: o login do administrador enxerga todas as empresas
+    return sb.auth.getUser().then(function (u) {
+      var uid = u.data && u.data.user && u.data.user.id;
+      if (!uid) throw new Error("Entre com seu e-mail e senha.");
+      return Promise.all([q(sb.from("empresas").select("*").eq("dono", uid).limit(1)), q(sb.from("planos").select("*").eq("ativo", true).order("ordem"))]);
+    }).then(function (r) {
       PLANOS = r[1] || [];
       if (!r[0] || !r[0].length) { telaPrimeiroAcesso(); return; }
       E = r[0][0]; carregarLogo(); montar();
@@ -290,7 +295,7 @@
       }).catch(function (e) { A.ocupado(b, false); $("#as-res").innerHTML = '<div class="aviso erro">' + esc(A.msgErro(e)) + "</div>"; });
     };
     if (/#assinatura/.test(location.hash) && document.referrer.indexOf("mercadopago") >= 0) $("#as-res").innerHTML = '<div class="aviso ok">Recebemos a sua assinatura. Assim que o Mercado Pago aprovar a cobrança, o acesso é liberado.</div>';
-    q(sb.from("pagamentos").select("*").order("criado_em", { ascending: false }).limit(20)).then(function (ps) {
+    q(sb.from("pagamentos").select("*").eq("empresa_id", E.id).order("criado_em", { ascending: false }).limit(20)).then(function (ps) {
       $("#as-hist").innerHTML = ps.length ? '<div class="tabela"><table><thead><tr><th>Data</th><th>Forma</th><th>Valor</th><th>Situação</th></tr></thead><tbody>' + ps.map(function (p) {
         var st = p.status === "approved" ? '<span class="selo bom">pago</span>' : p.status === "pending" ? '<span class="selo atencao">aguardando</span>' : '<span class="selo critico">' + esc(p.status) + "</span>";
         return "<tr><td>" + A.data(p.pago_em || p.criado_em) + "</td><td>" + (p.tipo === "pix" ? "Pix" : p.tipo === "cartao" ? "Cartão" : "Manual") + "</td><td>" + A.dinheiro(p.valor) + "</td><td>" + st + "</td></tr>";
