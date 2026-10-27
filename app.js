@@ -164,7 +164,8 @@
   }
   function verCriar(c) {
     var M = R.MODELOS[arte.modelo];
-    if (!Object.keys(arte.campos).length) M.campos.forEach(function (f) { arte.campos[f[0]] = f[2]; });
+    // ao trocar de modelo, os campos novos começam com o exemplo; os já preenchidos continuam
+    M.campos.forEach(function (f) { if (!(f[0] in arte.campos)) arte.campos[f[0]] = f[2]; });
     c.innerHTML = '<div class="cartao"><h3 style="margin-bottom:10px">1. Escolha o modelo</h3><div class="modelos">' +
       Object.keys(R.MODELOS).map(function (k) { var m = R.MODELOS[k]; return '<button data-modelo="' + k + '" class="' + (k === arte.modelo ? "ativo" : "") + '"><span class="ic">' + m.ic + "</span>" + esc(m.nome) + "</button>"; }).join("") +
       '</div></div><div class="editor"><div class="cartao"><h3>2. Preencha</h3><label for="ar-fmt">Formato</label><select id="ar-fmt">' +
