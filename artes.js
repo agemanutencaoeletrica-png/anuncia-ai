@@ -65,7 +65,7 @@
     return junto.concat(t.map(function (w) { return "#" + w; })).concat([RAMOS.Outro]).join(" ");
   }
   var MODELOS = {
-    promocao: { nome: "Promoção", ic: "🔥", fotos: 1, campos: [["titulo", "Produto ou serviço", "Pizza grande"], ["de", "Preço antes (opcional)", "59,90"], ["por", "Preço agora", "39,90"], ["detalhe", "Detalhe", "Só até domingo!"]] },
+    promocao: { nome: "Promoção", ic: "🔥", fotos: 1, campos: [["titulo", "Produto ou serviço", "Pizza grande"], ["de", "Preço antes (opcional)", "59,90"], ["por", "Preço agora (número ou texto, ex.: Sob orçamento)", "39,90"], ["detalhe", "Detalhe", "Só até domingo!"]] },
     novidade: { nome: "Novidade", ic: "✨", fotos: 1, campos: [["titulo", "Título", "Chegou novidade!"], ["texto", "Texto", "Venha conhecer a nova coleção"]] },
     antes_depois: { nome: "Antes e depois", ic: "🔁", fotos: 2, campos: [["titulo", "Título", "Transformação completa"]] },
     servico: { nome: "Serviços", ic: "🛠️", fotos: 0, campos: [["titulo", "Título", "Nossos serviços"], ["itens", "Itens (um por linha, até 5)", "Instalação\nManutenção\nReforma"], ["detalhe", "Chamada", "Orçamento sem compromisso!"]] },
@@ -73,6 +73,9 @@
     frase: { nome: "Frase do dia", ic: "💬", fotos: 0, campos: [["texto", "Frase", "Quem faz com amor faz melhor."], ["autor", "Autor (opcional)", ""]] }
   };
 
+  // preço: número ganha "R$"; texto (ex.: "Sob orçamento") aparece como foi escrito
+  function ehValor(v) { return /^\s*(R\$\s*)?\d[\d.,]*\s*$/i.test(String(v || "")); }
+  function preco(v) { v = String(v || "").trim(); return ehValor(v) ? "R$ " + v.replace(/^R\$\s*/i, "") : v; }
   function luz(hex) { var n = parseInt(String(hex || "#000000").slice(1), 16); var r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
   function escurecer(hex, f) {
     var n = parseInt(String(hex || "#7c3aed").slice(1), 16);
@@ -148,9 +151,10 @@
       var altFoto = Math.round((fimArea - y) * 0.52);
       cobrir(cx, d.fotos && d.fotos[0], P, y, larg, altFoto); y += altFoto + 30;
       y += texto(cx, c.titulo, P, y, larg, { tam: 70, min: 40, linhas: 2, cor: txt }) + 10;
-      if (c.de) { cx.font = "700 46px system-ui, Arial"; cx.fillStyle = txt2; var t1 = "De R$ " + c.de; cx.fillText(t1, P, y); var w1 = cx.measureText(t1).width;
+      if (c.de) { cx.font = "700 46px system-ui, Arial"; cx.fillStyle = txt2; var t1 = "De " + preco(c.de); cx.fillText(t1, P, y); var w1 = cx.measureText(t1).width;
         cx.fillRect(P, y + 26, w1, 5); y += 62; }
-      cx.font = "900 110px system-ui, Arial"; cx.fillStyle = cor2; cx.textBaseline = "top"; cx.fillText((c.de ? "Por " : "") + "R$ " + (c.por || "0,00"), P, y, larg); y += 130;
+      if (ehValor(c.por)) { cx.font = "900 110px system-ui, Arial"; cx.fillStyle = cor2; cx.textBaseline = "top"; cx.fillText((c.de ? "Por " : "") + preco(c.por), P, y, larg); y += 130; }
+      else if (c.por) y += texto(cx, c.por, P, y, larg, { tam: 80, min: 40, linhas: 2, peso: "900", cor: cor2 }) + 20;
       if (c.detalhe) texto(cx, c.detalhe, P, y, larg, { tam: 44, min: 28, linhas: 2, peso: "700", cor: txt });
     } else if (d.modelo === "novidade") {
       pilula(cx, "NOVIDADE", P, y, cor2, luz(cor2) > 0.6 ? "#1d1830" : "#fff", 42); y += 100;
@@ -200,7 +204,7 @@
     var tags = tagsRamo(e.ramo) + (e.cidade ? " #" + String(e.cidade).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase() : "");
     var contato = [e.whatsapp ? "📲 WhatsApp: " + e.whatsapp : "", e.cidade ? "📍 " + e.cidade : ""].filter(Boolean).join("\n");
     var t;
-    if (modelo === "promocao") t = "🔥 PROMOÇÃO: " + (c.titulo || "") + "\n" + (c.de ? "De R$ " + c.de + " por " : "Por ") + "R$ " + (c.por || "") + "!" + (c.detalhe ? "\n" + c.detalhe : "");
+    if (modelo === "promocao") t = "🔥 PROMOÇÃO: " + (c.titulo || "") + (c.por ? "\n" + (ehValor(c.por) ? (c.de ? "De " + preco(c.de) + " por " : "Por ") + preco(c.por) + "!" : (c.de ? "De " + preco(c.de) + " · " : "") + c.por) : "") + (c.detalhe ? "\n" + c.detalhe : "");
     else if (modelo === "novidade") t = "✨ " + (c.titulo || "Novidade!") + "\n" + (c.texto || "");
     else if (modelo === "antes_depois") t = "🔁 Antes e depois: " + (c.titulo || "") + "\nArraste para o lado e veja a diferença! 😍";
     else if (modelo === "servico") t = "🛠️ " + (c.titulo || "") + "\n" + String(c.itens || "").split("\n").filter(Boolean).map(function (x) { return "✅ " + x.trim(); }).join("\n") + (c.detalhe ? "\n\n" + c.detalhe : "");
