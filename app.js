@@ -4,7 +4,7 @@
   var A = window.AN, R = window.AN_ARTES, esc = A.esc, $ = A.$, $$ = A.$$;
   var app = $("#app"), sb = null, E = null, PLANOS = [], logoImg = null, logoDe = null;
   var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"]];
-  var arte = { modelo: "promocao", formato: "post", campos: {}, fotos: [], legendaEditada: false };
+  var arte = { modelo: "promocao", formato: "post", campos: {}, fotos: [], fotosURL: [], legenda: "", legendaEditada: false, por: {}, emp: null };
   var vigiaPix = null;
 
   function q(p) { return p.then(function (r) { if (r.error) throw r.error; return r.data; }); }
@@ -152,6 +152,51 @@
   }
 
   // ---------- criar arte ----------
+  // ---------- rascunho: cada modelo guarda o que foi escrito (e as fotos), neste aparelho ----------
+  function chaveRasc() { return "anuncia_rascunho_" + E.id; }
+  function guardarAtual() {
+    arte.por[arte.modelo] = { campos: arte.campos, fotos: arte.fotos, fotosURL: arte.fotosURL, legenda: arte.legenda, legendaEditada: arte.legendaEditada };
+  }
+  function abrirModelo(m) {
+    var r = arte.por[m] || {};
+    arte.modelo = m; arte.campos = r.campos || {}; arte.fotos = r.fotos || []; arte.fotosURL = r.fotosURL || [];
+    arte.legenda = r.legenda || ""; arte.legendaEditada = !!r.legendaEditada;
+  }
+  function salvarRasc() {
+    guardarAtual();
+    var por = {};
+    Object.keys(arte.por).forEach(function (m) { var r = arte.por[m]; por[m] = { campos: r.campos, fotosURL: r.fotosURL, legenda: r.legenda, legendaEditada: r.legendaEditada }; });
+    var d = { modelo: arte.modelo, formato: arte.formato, por: por };
+    try { localStorage.setItem(chaveRasc(), JSON.stringify(d)); } catch (e) {
+      // sem espaço para as fotos: guarda só os textos (as fotos continuam enquanto o app estiver aberto)
+      Object.keys(por).forEach(function (m) { por[m].fotosURL = []; });
+      try { localStorage.setItem(chaveRasc(), JSON.stringify(d)); } catch (e2) { /* armazenamento bloqueado */ }
+    }
+  }
+  function carregarRasc() {
+    if (arte.emp === E.id) return;
+    arte.emp = E.id; arte.por = {}; arte.modelo = "promocao"; arte.formato = "post";
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(chaveRasc()) || "null"); } catch (e) { d = null; }
+    if (d && d.por) {
+      Object.keys(d.por).forEach(function (m) {
+        if (!R.MODELOS[m]) return;
+        var r = d.por[m] || {}, fotos = [];
+        (r.fotosURL || []).forEach(function (u, i) { if (!u) return; var im = new Image(); im.onload = function () { if (arte.modelo === m) redesenhar(); }; im.src = u; fotos[i] = im; });
+        arte.por[m] = { campos: r.campos || {}, fotos: fotos, fotosURL: r.fotosURL || [], legenda: r.legenda || "", legendaEditada: !!r.legendaEditada };
+      });
+      if (R.MODELOS[d.modelo]) arte.modelo = d.modelo;
+      if (R.FORMATOS[d.formato]) arte.formato = d.formato;
+    }
+    abrirModelo(arte.modelo);
+  }
+  // foto reduzida (até 1280 px) em JPEG, para caber no rascunho do aparelho
+  function fotoReduzida(im) {
+    var k = Math.min(1, 1280 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
+    cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k); cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
+    return cv.toDataURL("image/jpeg", 0.82);
+  }
+
   var temporizador = null;
   function redesenhar() {
     clearTimeout(temporizador);
@@ -159,10 +204,12 @@
       var cv = $("#cv-arte");
       if (!cv) return;
       R.desenhar(cv, { modelo: arte.modelo, formato: arte.formato, campos: arte.campos, fotos: arte.fotos, empresa: E, logo: logoImg });
-      if (!arte.legendaEditada && $("#ar-leg")) $("#ar-leg").value = R.legenda(arte.modelo, arte.campos, E);
+      if (!arte.legendaEditada && $("#ar-leg")) $("#ar-leg").value = arte.legenda = R.legenda(arte.modelo, arte.campos, E);
+      salvarRasc();
     }, 120);
   }
   function verCriar(c) {
+    carregarRasc();
     var M = R.MODELOS[arte.modelo];
     // ao trocar de modelo, os campos novos começam com o exemplo; os já preenchidos continuam
     M.campos.forEach(function (f) { if (!(f[0] in arte.campos)) arte.campos[f[0]] = f[2]; });
@@ -179,26 +226,38 @@
         return '<label class="botao peq" style="margin:0;cursor:pointer">📷 ' + (M.fotos === 2 ? (i ? "Depois" : "Antes") : "Escolher foto") + '<input type="file" accept="image/*" data-foto="' + i + '" class="oculto"></label>';
       }).join("") + "</div>" : "") +
       (!E.logo ? '<div class="aviso peq">Dica: coloque o seu logo em <a href="#marca">Minha marca</a> para ele aparecer nas artes.</div>' : "") +
-      '<label for="ar-leg">Legenda do post</label><textarea id="ar-leg" rows="7"></textarea><button class="texto peq" id="ar-regera">↻ Gerar a legenda de novo</button></div>' +
+      '<label for="ar-leg">Legenda do post</label><textarea id="ar-leg" rows="7"></textarea><button class="texto peq" id="ar-regera">↻ Gerar a legenda de novo</button>' +
+      '<p class="mudo peq" style="margin-top:8px">💾 O que você escreve fica salvo neste aparelho, em cada modelo. <button class="texto peq" id="ar-limpar">🧹 Limpar este modelo</button></p></div>' +
       '<div><div class="previa cartao" style="padding:10px"><canvas id="cv-arte" aria-label="Prévia da arte"></canvas></div>' +
       '<div class="acoes" style="margin-top:0">' + (podeCompartilhar() ? '<button class="prim" id="ar-postar">📤 Postar (Instagram, Facebook, WhatsApp, Telegram...)</button>' : "") +
       '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button></div>' +
       '<p class="mudo peq">No Instagram a legenda não vai junto automaticamente: ela já fica copiada, é só colar no post.</p></div></div>';
     $$("[data-modelo]", c).forEach(function (b) {
-      b.onclick = function () { arte.modelo = b.dataset.modelo; arte.campos = {}; arte.fotos = []; arte.legendaEditada = false; verCriar(c); };
+      b.onclick = function () { guardarAtual(); abrirModelo(b.dataset.modelo); salvarRasc(); verCriar(c); };
     });
     $$("[data-campo]", c).forEach(function (i) {
       i.value = arte.campos[i.dataset.campo] || "";
       i.oninput = function () { arte.campos[i.dataset.campo] = i.value; redesenhar(); };
     });
     $("#ar-fmt", c).onchange = function () { arte.formato = this.value; redesenhar(); };
+    $("#ar-limpar", c).onclick = function () {
+      if (!window.confirm("Apagar o que foi escrito neste modelo e voltar ao exemplo?")) return;
+      delete arte.por[arte.modelo]; abrirModelo(arte.modelo); salvarRasc(); verCriar(c);
+    };
+    if (arte.legendaEditada) $("#ar-leg", c).value = arte.legenda;
     $$("[data-foto]", c).forEach(function (inp) {
       inp.onchange = function () {
         var f = inp.files && inp.files[0]; if (!f) return;
-        var im = new Image(); im.onload = function () { arte.fotos[Number(inp.dataset.foto)] = im; redesenhar(); }; im.src = URL.createObjectURL(f);
+        var n = Number(inp.dataset.foto), im = new Image();
+        im.onload = function () {
+          var u = fotoReduzida(im), red = new Image();
+          red.onload = function () { arte.fotos[n] = red; arte.fotosURL[n] = u; redesenhar(); }; red.src = u;
+          URL.revokeObjectURL(im.src);
+        };
+        im.src = URL.createObjectURL(f);
       };
     });
-    $("#ar-leg", c).oninput = function () { arte.legendaEditada = true; };
+    $("#ar-leg", c).oninput = function () { arte.legendaEditada = true; arte.legenda = this.value; salvarRasc(); };
     $("#ar-regera", c).onclick = function () { arte.legendaEditada = false; redesenhar(); };
     function blob() { return new Promise(function (ok) { $("#cv-arte").toBlob(ok, "image/jpeg", 0.92); }); }
     function nome() { return "anuncia-ai-" + arte.modelo + "-" + Date.now() + ".jpg"; }
