@@ -248,8 +248,9 @@
         var k = Math.min(1, 600 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
         cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k); cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
         cv.toBlob(function (b) {
+          // nome novo a cada envio: sem "upsert", que exigiria regras de leitura e troca no Storage
           var caminho = E.id + "/logo-" + Date.now() + ".png";
-          q(sb.storage.from("logos").upload(caminho, b, { contentType: "image/png", upsert: true })).then(function () { return salvar({ logo: caminho }); })
+          q(sb.storage.from("logos").upload(caminho, b, { contentType: "image/png", upsert: false })).then(function () { return salvar({ logo: caminho }); })
             .then(function () { A.avisar("Logo salvo", "ok"); verMarca(c); }).catch(function (e) { A.avisar(A.msgErro(e), "erro"); });
         }, "image/png");
       };
