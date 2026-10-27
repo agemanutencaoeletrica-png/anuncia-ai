@@ -65,7 +65,9 @@
     return junto.concat(t.map(function (w) { return "#" + w; })).concat([RAMOS.Outro]).join(" ");
   }
   var MODELOS = {
-    promocao: { nome: "Promoção", ic: "🔥", fotos: 1, campos: [["titulo", "Produto ou serviço", "Pizza grande"], ["de", "Preço antes (opcional)", "59,90"], ["por", "Preço agora (número ou texto, ex.: Sob orçamento)", "39,90"], ["detalhe", "Detalhe", "Só até domingo!"]] },
+    promocao: { nome: "Promoção", ic: "🔥", fotos: 1, campos: [["selo", "Selo", "PROMOÇÃO"], ["titulo", "Produto ou serviço", "Pizza grande"], ["de", "Preço antes (opcional)", "59,90"], ["por", "Preço agora (número ou texto, ex.: Sob orçamento)", "39,90"], ["detalhe", "Detalhe", "Só até domingo!"]] },
+    divulgar: { nome: "Divulgar serviço", ic: "📣", fotos: 1, campos: [["selo", "Selo (opcional)", "ORÇAMENTO GRÁTIS"], ["titulo", "Serviço", "Pintura de fachada"],
+      ["texto", "Descrição", "Equipe treinada, material de qualidade e garantia"], ["detalhe", "Chamada", "Peça seu orçamento!"]] },
     novidade: { nome: "Novidade", ic: "✨", fotos: 1, campos: [["titulo", "Título", "Chegou novidade!"], ["texto", "Texto", "Venha conhecer a nova coleção"]] },
     antes_depois: { nome: "Antes e depois", ic: "🔁", fotos: 2, campos: [["titulo", "Título", "Transformação completa"]] },
     servico: { nome: "Serviços", ic: "🛠️", fotos: 0, campos: [["titulo", "Título", "Nossos serviços"], ["itens", "Itens (um por linha, até 5)", "Instalação\nManutenção\nReforma"], ["detalhe", "Chamada", "Orçamento sem compromisso!"]] },
@@ -147,7 +149,7 @@
     var rod = 150 + (story ? 80 : 0), fimArea = H - rod, larg = W - 2 * P;
 
     if (d.modelo === "promocao") {
-      pilula(cx, "PROMOÇÃO", P, y, cor2, luz(cor2) > 0.6 ? "#1d1830" : "#fff", 42); y += 100;
+      if (c.selo !== "") { pilula(cx, c.selo || "PROMOÇÃO", P, y, cor2, luz(cor2) > 0.6 ? "#1d1830" : "#fff", 42); y += 100; }
       var altFoto = Math.round((fimArea - y) * 0.52);
       cobrir(cx, d.fotos && d.fotos[0], P, y, larg, altFoto); y += altFoto + 30;
       y += texto(cx, c.titulo, P, y, larg, { tam: 70, min: 40, linhas: 2, cor: txt }) + 10;
@@ -156,6 +158,14 @@
       if (ehValor(c.por)) { cx.font = "900 110px system-ui, Arial"; cx.fillStyle = cor2; cx.textBaseline = "top"; cx.fillText((c.de ? "Por " : "") + preco(c.por), P, y, larg); y += 130; }
       else if (c.por) y += texto(cx, c.por, P, y, larg, { tam: 80, min: 40, linhas: 2, peso: "900", cor: cor2 }) + 20;
       if (c.detalhe) texto(cx, c.detalhe, P, y, larg, { tam: 44, min: 28, linhas: 2, peso: "700", cor: txt });
+    } else if (d.modelo === "divulgar") {
+      if (c.selo) { pilula(cx, c.selo, P, y, cor2, luz(cor2) > 0.6 ? "#1d1830" : "#fff", 42); y += 100; }
+      var adv = Math.round((fimArea - y) * 0.5);
+      cobrir(cx, d.fotos && d.fotos[0], P, y, larg, adv); y += adv + 30;
+      y += texto(cx, c.titulo, P, y, larg, { tam: 76, min: 40, linhas: 2, cor: txt }) + 10;
+      if (c.texto) y += texto(cx, c.texto, P, y, larg, { tam: 44, min: 28, linhas: 2, peso: "600", cor: txt2 }) + 20;
+      if (c.detalhe) { var hd = 110; cx.fillStyle = cor2; arred(cx, P, y, larg, hd, 30); cx.fill();
+        texto(cx, c.detalhe, P + 30, y + 24, larg - 60, { tam: 50, min: 30, linhas: 1, centro: true, cor: luz(cor2) > 0.6 ? "#1d1830" : "#fff" }); }
     } else if (d.modelo === "novidade") {
       pilula(cx, "NOVIDADE", P, y, cor2, luz(cor2) > 0.6 ? "#1d1830" : "#fff", 42); y += 100;
       var af = Math.round((fimArea - y) * 0.6);
@@ -205,6 +215,7 @@
     var contato = [e.whatsapp ? "📲 WhatsApp: " + e.whatsapp : "", e.cidade ? "📍 " + e.cidade : ""].filter(Boolean).join("\n");
     var t;
     if (modelo === "promocao") t = "🔥 PROMOÇÃO: " + (c.titulo || "") + (c.por ? "\n" + (ehValor(c.por) ? (c.de ? "De " + preco(c.de) + " por " : "Por ") + preco(c.por) + "!" : (c.de ? "De " + preco(c.de) + " · " : "") + c.por) : "") + (c.detalhe ? "\n" + c.detalhe : "");
+    else if (modelo === "divulgar") t = "📣 " + (c.titulo || "") + (c.texto ? "\n" + c.texto : "") + (c.selo ? "\n✅ " + c.selo : "") + (c.detalhe ? "\n👉 " + c.detalhe : "");
     else if (modelo === "novidade") t = "✨ " + (c.titulo || "Novidade!") + "\n" + (c.texto || "");
     else if (modelo === "antes_depois") t = "🔁 Antes e depois: " + (c.titulo || "") + "\nArraste para o lado e veja a diferença! 😍";
     else if (modelo === "servico") t = "🛠️ " + (c.titulo || "") + "\n" + String(c.itens || "").split("\n").filter(Boolean).map(function (x) { return "✅ " + x.trim(); }).join("\n") + (c.detalhe ? "\n\n" + c.detalhe : "");
