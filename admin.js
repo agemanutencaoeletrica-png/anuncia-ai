@@ -35,8 +35,10 @@
       q(sb.from("empresas").select("*").order("valido_ate")),
       q(sb.from("pagamentos").select("*").order("criado_em", { ascending: false }).limit(1000)),
       q(sb.from("avisos").select("*").order("enviado_em", { ascending: false }).limit(500)),
-      q(sb.from("planos").select("*").order("ordem"))
-    ]).then(function (r) { S.emp = r[0]; S.pag = r[1]; S.av = r[2]; S.planos = r[3]; });
+      q(sb.from("planos").select("*").order("ordem")),
+      // sem o supabase/sugestoes.sql rodado, a aba avisa em vez de quebrar o painel
+      q(sb.from("sugestoes").select("*").order("criado_em", { ascending: false }).limit(500)).catch(function () { return null; })
+    ]).then(function (r) { S.emp = r[0]; S.pag = r[1]; S.av = r[2]; S.planos = r[3]; S.sug = r[4]; });
   }
   function montar() {
     app.innerHTML = '<div class="topo"><div class="marca">Anuncia <span>Aí</span></div><div class="peq">Painel do dono</div><div class="dir"><button class="peq" id="b-rec">↻</button><button class="peq" id="b-sair">Sair</button></div></div>' +
@@ -45,11 +47,12 @@
     $("#b-rec").onclick = function () { carregar().then(function () { rota(); A.avisar("Atualizado"); }); };
     window.addEventListener("hashchange", rota); rota();
   }
-  var ABAS = [["empresas", "Empresas"], ["pagamentos", "Pagamentos"], ["avisos", "Avisos enviados"], ["planos", "Planos"]];
+  var ABAS = [["empresas", "Empresas"], ["pagamentos", "Pagamentos"], ["avisos", "Avisos enviados"], ["sugestoes", "Sugestões"], ["planos", "Planos"]];
   function rota() {
     var aba = location.hash.slice(1) || "empresas"; if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "empresas";
-    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + "</a>"; }).join("");
-    ({ empresas: verEmpresas, pagamentos: verPagamentos, avisos: verAvisos, planos: verPlanos })[aba]($("#conteudo"));
+    var novas = (S.sug || []).filter(function (x) { return !x.lida; }).length;
+    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" && novas ? " (" + novas + ")" : "") + "</a>"; }).join("");
+    ({ empresas: verEmpresas, pagamentos: verPagamentos, avisos: verAvisos, sugestoes: verSugestoes, planos: verPlanos })[aba]($("#conteudo"));
   }
   function nomePlano(id) { var p = S.planos.filter(function (x) { return x.id === id; })[0]; return p ? p.nome : id || "—"; }
   function selo(e) {
@@ -153,6 +156,31 @@
         return "<tr><td>" + A.dataHora(a.enviado_em) + "</td><td>" + esc(nome(a.empresa_id)) + "</td><td>" + esc(rot[a.tipo] || a.tipo) + "</td><td>" + esc(a.canal) + "</td><td>" +
           (a.ok ? '<span class="selo bom">enviado</span>' : '<span class="selo critico">' + esc(a.erro || "falhou") + "</span>") + "</td></tr>";
       }).join("") : '<tr><td colspan="5" class="vazio">Nenhum aviso ainda.</td></tr>') + "</tbody></table></div></div>";
+  }
+  function verSugestoes(c) {
+    if (!S.sug) { c.innerHTML = '<div class="cartao"><h2>Sugestões</h2><div class="aviso">Para receber sugestões dos clientes, rode uma vez o <b>supabase/sugestoes.sql</b> no SQL Editor do Supabase.</div></div>'; return; }
+    var emp = function (id) { return S.emp.filter(function (x) { return x.id === id; })[0] || { nome: "—" }; };
+    var rot = { sugestao: "💡 sugestão", problema: "⚠️ problema", elogio: "👏 elogio" };
+    c.innerHTML = '<div class="cartao"><h2>Sugestões dos clientes</h2><p class="mudo peq">Chegam pela aba “💡 Sugestões” do app. A resposta aparece para o cliente lá mesmo.</p>' +
+      (S.sug.length ? S.sug.map(function (x) {
+        var e = emp(x.empresa_id);
+        return '<div style="padding:12px 0;border-top:1px solid var(--borda)" data-sug="' + esc(x.id) + '"><b>' + esc(e.nome) + '</b> <span class="selo">' + esc(rot[x.tipo] || x.tipo) + "</span> " +
+          (x.lida ? '<span class="selo bom">lida</span>' : '<span class="selo atencao">nova</span>') + ' <span class="peq mudo">' + A.dataHora(x.criado_em) + "</span>" +
+          '<div style="margin:6px 0;white-space:pre-wrap">' + esc(x.texto) + "</div>" +
+          '<textarea rows="2" maxlength="1000" placeholder="Resposta (o cliente vê no app)">' + esc(x.resposta || "") + "</textarea>" +
+          '<div class="acoes" style="margin-top:6px"><button class="peq prim" data-resp>Salvar resposta</button>' + (x.lida ? "" : '<button class="peq" data-lida>✓ Marcar lida</button>') +
+          (e.whatsapp ? '<a class="botao peq zap" target="_blank" rel="noopener" href="' + esc(A.linkZap(e.whatsapp, "Olá, " + e.nome + "! Aqui é do Anuncia Aí. Sobre a sua mensagem: “" + x.texto.slice(0, 200) + "”")) + '">📲 WhatsApp</a>' : "") + "</div></div>";
+      }).join("") : '<div class="vazio">Nenhuma sugestão ainda.</div>') + "</div>";
+    function salvar(id, dados, ok) {
+      q(sb.from("sugestoes").update(dados).eq("id", id).select()).then(function (r) {
+        var x = S.sug.filter(function (s) { return s.id === id; })[0]; if (x && r[0]) Object.assign(x, r[0]); A.avisar(ok, "ok"); rota();
+      }).catch(function (e) { A.avisar(A.msgErro(e), "erro"); });
+    }
+    $$("[data-sug]", c).forEach(function (el) {
+      var id = el.dataset.sug;
+      $("[data-resp]", el).onclick = function () { salvar(id, { resposta: $("textarea", el).value.trim() || null, lida: true }, "Resposta salva"); };
+      if ($("[data-lida]", el)) $("[data-lida]", el).onclick = function () { salvar(id, { lida: true }, "Marcada como lida"); };
+    });
   }
   function verPlanos(c) {
     c.innerHTML = '<div class="cartao"><h2>Planos e preços</h2><p class="mudo peq">Novos pagamentos usam o preço daqui. Quem já assina no cartão continua no valor da assinatura dele.</p>' +

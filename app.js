@@ -3,7 +3,7 @@
   "use strict";
   var A = window.AN, R = window.AN_ARTES, esc = A.esc, $ = A.$, $$ = A.$$;
   var app = $("#app"), sb = null, E = null, PLANOS = [], logoImg = null, logoDe = null;
-  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["assinatura", "💳 Assinatura"]];
+  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"]];
   var arte = { modelo: "promocao", formato: "post", campos: {}, fotos: [], legendaEditada: false };
   var vigiaPix = null;
 
@@ -143,12 +143,12 @@
   function rota() {
     var aba = location.hash.slice(1) || "criar";
     if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "criar";
-    if (A.situacao(E).bloqueada && aba !== "assinatura") aba = "assinatura";
+    if (A.situacao(E).bloqueada && aba !== "assinatura" && aba !== "sugestoes") aba = "assinatura";
     if (vigiaPix && aba !== "assinatura") { clearInterval(vigiaPix); vigiaPix = null; }
     $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + "</a>"; }).join("");
     faixa();
     var c = $("#conteudo");
-    ({ criar: verCriar, marca: verMarca, assinatura: verAssinatura })[aba](c);
+    ({ criar: verCriar, marca: verMarca, assinatura: verAssinatura, sugestoes: verSugestoes })[aba](c);
   }
 
   // ---------- criar arte ----------
@@ -255,6 +255,39 @@
       };
       im.src = URL.createObjectURL(f);
     };
+  }
+
+  // ---------- sugestões ----------
+  var TIPOS_SUG = { sugestao: "💡 Sugestão", problema: "⚠️ Problema", elogio: "👏 Elogio" };
+  function verSugestoes(c) {
+    var zap = A.CFG.SUPORTE_WHATSAPP;
+    c.innerHTML = '<div class="cartao"><h2>💡 Sugestões</h2><p class="mudo peq">Ideia de modelo novo, algo que não funcionou ou um elogio: a mensagem chega direto para a equipe do Anuncia Aí.</p>' +
+      '<label for="sg-tipo">Tipo</label><select id="sg-tipo">' + Object.keys(TIPOS_SUG).map(function (k) { return '<option value="' + k + '">' + TIPOS_SUG[k] + "</option>"; }).join("") + "</select>" +
+      '<label for="sg-texto">Mensagem</label><textarea id="sg-texto" rows="4" maxlength="1000" placeholder="Ex.: queria um modelo de cardápio da semana"></textarea>' +
+      '<div id="sg-msg"></div><div class="acoes"><button class="prim" id="sg-enviar">Enviar</button>' +
+      (zap ? '<a class="botao" id="sg-zap" target="_blank" rel="noopener" href="#">📲 Falar no WhatsApp</a>' : "") + "</div></div>" +
+      '<div class="cartao"><h2>Minhas mensagens</h2><div id="sg-lista" class="mudo peq">Carregando...</div></div>';
+    function textoZap() { return "Olá! Sou da " + E.nome + " (Anuncia Aí). " + TIPOS_SUG[$("#sg-tipo").value].replace(/^\S+ /, "") + ": " + $("#sg-texto").value.trim(); }
+    if ($("#sg-zap")) $("#sg-zap").onclick = function () { this.href = A.linkZap(zap, textoZap()); };
+    function lista() {
+      q(sb.from("sugestoes").select("*").eq("empresa_id", E.id).order("criado_em", { ascending: false }).limit(30)).then(function (ls) {
+        $("#sg-lista").innerHTML = ls.length ? ls.map(function (x) {
+          return '<div style="padding:10px 0;border-top:1px solid var(--borda)"><span class="selo">' + esc(TIPOS_SUG[x.tipo] || x.tipo) + "</span> " +
+            '<span class="peq mudo">' + A.dataHora(x.criado_em) + "</span> " + (x.lida ? '<span class="selo bom">lida</span>' : '<span class="selo atencao">enviada</span>') +
+            '<div style="margin-top:6px;white-space:pre-wrap">' + esc(x.texto) + "</div>" +
+            (x.resposta ? '<div class="aviso ok" style="margin-top:6px;white-space:pre-wrap"><b>Resposta:</b> ' + esc(x.resposta) + "</div>" : "") + "</div>";
+        }).join("") : "Você ainda não enviou nenhuma mensagem.";
+      }).catch(function () { $("#sg-lista").textContent = "As sugestões ainda não estão ativas. Use o WhatsApp acima."; });
+    }
+    $("#sg-enviar").onclick = function () {
+      var b = this, t = $("#sg-texto").value.trim();
+      if (t.length < 3) { $("#sg-msg").innerHTML = '<div class="aviso erro">Escreva a sua mensagem.</div>'; return; }
+      A.ocupado(b, true, "Enviando...");
+      q(sb.rpc("enviar_sugestao", { p_tipo: $("#sg-tipo").value, p_texto: t })).then(function () {
+        A.ocupado(b, false); $("#sg-texto").value = ""; $("#sg-msg").innerHTML = '<div class="aviso ok">Recebemos! Obrigado por ajudar a melhorar o Anuncia Aí.</div>'; lista();
+      }).catch(function (e) { A.ocupado(b, false); $("#sg-msg").innerHTML = '<div class="aviso erro">' + esc(A.msgErro(e)) + "</div>"; });
+    };
+    lista();
   }
 
   // ---------- assinatura ----------
