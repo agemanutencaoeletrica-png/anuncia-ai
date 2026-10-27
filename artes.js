@@ -64,6 +64,99 @@
     var junto = t.length > 1 ? ["#" + t.join("")] : [];
     return junto.concat(t.map(function (w) { return "#" + w; })).concat([RAMOS.Outro]).join(" ");
   }
+  // ---------- frases do dia: por tema e pelo ramo da empresa ----------
+  var TEMAS_FRASE = {
+    ramo: "🏷️ Do meu ramo", motivacional: "💪 Motivacional", prosperidade: "💰 Prosperidade", fe: "🙏 Fé e esperança",
+    gratidao: "💛 Gratidão", trabalho: "🛠️ Trabalho e capricho", clientes: "🤝 Para os clientes", segunda: "☀️ Bom dia / semana", familia: "🏠 Família"
+  };
+  var FRASES = {
+    motivacional: [
+      "Grandes obras começam com um primeiro passo bem dado.", "Não espere a hora certa: comece e ajuste no caminho.",
+      "Cada dia é uma chance nova de fazer melhor que ontem.", "Disciplina leva aonde a motivação sozinha não chega.",
+      "Quem não desiste já está na frente.", "Pequenos avanços todo dia viram grandes resultados.",
+      "O cansaço passa, o orgulho do trabalho feito fica.", "Sonho grande se constrói com tarefa pequena bem feita.",
+      "Você não precisa ser perfeito, precisa ser constante.", "Hoje é um ótimo dia para começar."
+    ],
+    prosperidade: [
+      "Prosperidade é plantar com trabalho e colher com gratidão.", "Quem trabalha com honestidade nunca fica sem caminho.",
+      "Que a sua semana seja de portas abertas e boas oportunidades.", "Cuide do pouco e o muito virá.",
+      "Riqueza de verdade é ter saúde, trabalho e gente boa por perto.", "Bons negócios nascem de boas relações.",
+      "Economia de hoje é tranquilidade de amanhã.", "Onde há esforço, há colheita.",
+      "Abundância começa quando a gente valoriza o que já tem.", "Prospere fazendo o bem: o resultado volta."
+    ],
+    fe: [
+      "Entregue o seu caminho a Deus e siga com fé.", "Quando o dia pesar, lembre: Deus está no controle.",
+      "A fé não tira as pedras do caminho, mas dá força para passar por elas.", "Gratidão a Deus por mais um dia de trabalho e saúde.",
+      "Tudo tem o seu tempo. Confie e continue.", "Com fé, cada recomeço é uma bênção.",
+      "Seja luz por onde passar.", "Deus abençoe o seu trabalho e a sua casa.",
+      "Esperança é acordar acreditando que hoje pode ser melhor.", "O que é seu está guardado. Continue fazendo a sua parte."
+    ],
+    gratidao: [
+      "Obrigado a cada cliente que confia no nosso trabalho.", "Gratidão por mais um dia de portas abertas.",
+      "Agradecer abre caminho para coisas boas.", "Cada cliente satisfeito é a nossa maior conquista.",
+      "Gratidão é a memória do coração.", "Hoje, agradeça por algo simples.",
+      "Somos gratos por fazer parte da sua história.", "Obrigado pela preferência e pela indicação!"
+    ],
+    trabalho: [
+      "Fazer bem feito é a melhor propaganda.", "Capricho não se vê só na entrega, se vê nos anos seguintes.",
+      "Qualidade é fazer certo mesmo quando ninguém está olhando.", "Serviço bom é aquele que o cliente indica.",
+      "O detalhe faz a diferença.", "Pressa passa, o acabamento fica.",
+      "Trabalho honesto é a base de tudo.", "Prazo cumprido é respeito com o cliente.",
+      "Segurança não é custo, é cuidado com quem volta para casa.", "Profissional bom aprende todo dia."
+    ],
+    clientes: [
+      "Seu sorriso é o nosso melhor resultado.", "Aqui você é tratado como gostaríamos de ser tratados.",
+      "Atender bem é o nosso jeito de agradecer.", "Você pede, a gente faz com carinho.",
+      "Conte com a gente: estamos aqui para ajudar.", "Indicou, ganhou nossa gratidão!",
+      "Seu bem-estar é a nossa prioridade.", "Volte sempre: a casa é sua."
+    ],
+    segunda: [
+      "Bom dia! Que a semana seja leve e produtiva.", "Nova semana, novas oportunidades.",
+      "Café, coragem e bora trabalhar!", "Comece o dia com gratidão e termine com orgulho.",
+      "Sexta chegou! Obrigado pela semana, até segunda.", "Bom dia! Hoje é dia de fazer acontecer.",
+      "Que o seu dia seja tão bom quanto o seu esforço.", "Segunda-feira é recomeço: vamos com tudo!"
+    ],
+    familia: [
+      "Tudo o que fazemos é pela nossa família.", "Casa cheia é coração feliz.",
+      "Família é onde a vida começa e o amor nunca acaba.", "Trabalhamos todo dia para levar o melhor para casa.",
+      "Empresa familiar: feito com o cuidado de quem é da casa.", "Tempo com a família é o melhor investimento."
+    ]
+  };
+  // frases do ramo: o grupo sai das palavras do ramo da empresa
+  var FRASES_RAMO = {
+    obra: ["Grandes obras começam com um bom planejamento.", "Bem feito uma vez, tranquilo por muitos anos.", "Seu espaço merece mão de obra de confiança.",
+      "Segurança e capricho em cada etapa da obra.", "Reforma boa é aquela que termina no prazo.", "Cor nova, ambiente novo, vida nova."],
+    comida: ["Comida boa é aquela que abraça.", "Feito com carinho, servido com alegria.", "Fome boa se resolve aqui.",
+      "O segredo é o tempero e o amor.", "Mesa cheia, coração feliz.", "Sabor de casa, feito para você."],
+    beleza: ["Cuidar de si é um ato de amor.", "Autoestima também é saúde.", "Você merece se sentir bem todos os dias.",
+      "Beleza é se sentir bem com quem você é.", "Um novo visual muda o dia.", "Tire um tempo para você."],
+    comercio: ["Aqui você encontra o que precisa com preço justo.", "Compre do pequeno: você ajuda um sonho a crescer.", "Atendimento de perto faz toda a diferença.",
+      "Novidades chegando toda semana!", "Qualidade que cabe no seu bolso.", "Obrigado por comprar no comércio do bairro."],
+    saude: ["Saúde é o nosso bem mais precioso.", "Prevenir é sempre o melhor cuidado.", "Cuide do corpo e da mente.",
+      "Pequenos hábitos, grande saúde.", "Seu bem-estar em primeiro lugar."],
+    pets: ["Quem tem pet tem amor em dobro.", "Pet feliz, casa feliz.", "Cuidamos do seu amigo como se fosse nosso."],
+    carro: ["Carro bem cuidado dura muito mais.", "Revisão em dia é segurança na estrada.", "Seu carro em boas mãos."],
+    negocio: ["Seu sonho merece um bom planejamento.", "Organização hoje, tranquilidade amanhã.", "Conquiste o que é seu com segurança.",
+      "Planejar é o primeiro passo para conquistar."]
+  };
+  function grupoRamo(ramo) {
+    var r = String(ramo || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    if (/pint|eletric|reform|constru|obra|gesso|drywall|encan|hidraul|ar-cond|refriger|marcen|serralh|vidrac|fachad|corda|pedreir|jardin|dedetiz|limpeza|chaveir|mudan|assistencia|prestador/.test(r)) return "obra";
+    if (/restaur|lanch|pizz|hamburg|acai|sorvet|marmit|padar|confeit|doce|bolo|bar|bebida|hortifr|acougue/.test(r)) return "comida";
+    if (/salao|beleza|barbear|manicur|sobrancel|cilio|estetic/.test(r)) return "beleza";
+    if (/saude|clinic|farmac|drogar|otica|academ|esport/.test(r)) return "saude";
+    if (/pet|veterin/.test(r)) return "pets";
+    if (/oficin|auto|lava|carro/.test(r)) return "carro";
+    if (/consorc|seguro|credit|contab|advoc|imobil|corretor/.test(r)) return "negocio";
+    return "comercio";
+  }
+  function frasesDoTema(tema, ramo) { return tema === "ramo" || !FRASES[tema] ? FRASES_RAMO[grupoRamo(ramo)] : FRASES[tema]; }
+  // a do dia muda sozinha a cada dia; "salto" pula para a próxima (botão Outra frase)
+  function fraseDoDia(tema, ramo, salto, data) {
+    var ls = frasesDoTema(tema, ramo), d = data || new Date();
+    var dia = Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+    return ls[(((dia + (salto || 0)) % ls.length) + ls.length) % ls.length];
+  }
   var MODELOS = {
     promocao: { nome: "Promoção", ic: "🔥", fotos: 1, campos: [["selo", "Selo", "PROMOÇÃO"], ["titulo", "Produto ou serviço", "Pizza grande"], ["de", "Preço antes (opcional)", "59,90"], ["por", "Preço agora (número ou texto, ex.: Sob orçamento)", "39,90"], ["detalhe", "Detalhe", "Só até domingo!"]] },
     divulgar: { nome: "Divulgar serviço", ic: "📣", fotos: 1, campos: [["selo", "Selo (opcional)", "ORÇAMENTO GRÁTIS"], ["titulo", "Serviço", "Pintura de fachada"],
@@ -226,5 +319,5 @@
     return t + "\n\n" + (e.nome ? e.nome + "\n" : "") + (contato ? contato + "\n" : "") + "\n" + tags;
   }
 
-  window.AN_ARTES = { FORMATOS: FORMATOS, RAMOS: RAMOS, MODELOS: MODELOS, desenhar: desenhar, legenda: legenda };
+  window.AN_ARTES = { FORMATOS: FORMATOS, RAMOS: RAMOS, MODELOS: MODELOS, TEMAS_FRASE: TEMAS_FRASE, fraseDoDia: fraseDoDia, frasesDoTema: frasesDoTema, desenhar: desenhar, legenda: legenda };
 })();
