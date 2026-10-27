@@ -190,6 +190,19 @@
     }
     abrirModelo(arte.modelo);
   }
+  // frase do dia: escolhe pelo tema (ou pelo ramo da empresa) e troca sozinha quando o dia muda
+  function fraseAutomatica(forcar) {
+    var c = arte.campos, hoje = new Date().toISOString().slice(0, 10);
+    if (!c.tema) {
+      // primeira vez: liga o automático só se a frase ainda é o exemplo (não apaga frase já escrita)
+      var exemplo = !c.texto || c.texto === R.MODELOS.frase.campos[0][2];
+      c.tema = "ramo"; c.auto = exemplo ? "1" : ""; if (!exemplo) return; forcar = true;
+    }
+    if (!forcar && !(c.auto && c.dia !== hoje)) return;
+    if (c.dia !== hoje && !forcar) c.salto = 0;
+    c.texto = R.fraseDoDia(c.tema, E.ramo, Number(c.salto) || 0); c.dia = hoje;
+    arte.legendaEditada = false;
+  }
   // foto reduzida (até 1280 px) em JPEG, para caber no rascunho do aparelho
   function fotoReduzida(im) {
     var k = Math.min(1, 1280 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
@@ -213,10 +226,15 @@
     var M = R.MODELOS[arte.modelo];
     // ao trocar de modelo, os campos novos começam com o exemplo; os já preenchidos continuam
     M.campos.forEach(function (f) { if (!(f[0] in arte.campos)) arte.campos[f[0]] = f[2]; });
+    if (arte.modelo === "frase") fraseAutomatica();
     c.innerHTML = '<div class="cartao"><h3 style="margin-bottom:10px">1. Escolha o modelo</h3><div class="modelos">' +
       Object.keys(R.MODELOS).map(function (k) { var m = R.MODELOS[k]; return '<button data-modelo="' + k + '" class="' + (k === arte.modelo ? "ativo" : "") + '"><span class="ic">' + m.ic + "</span>" + esc(m.nome) + "</button>"; }).join("") +
       '</div></div><div class="editor"><div class="cartao"><h3>2. Preencha</h3><label for="ar-fmt">Formato</label><select id="ar-fmt">' +
       Object.keys(R.FORMATOS).map(function (k) { return '<option value="' + k + '"' + (k === arte.formato ? " selected" : "") + ">" + R.FORMATOS[k][2] + "</option>"; }).join("") + "</select>" +
+      (arte.modelo === "frase" ? '<label for="ar-tema">Tema da frase</label><div class="linha"><select id="ar-tema" style="flex:1">' +
+        Object.keys(R.TEMAS_FRASE).map(function (k) { return '<option value="' + k + '"' + (k === arte.campos.tema ? " selected" : "") + ">" + esc(R.TEMAS_FRASE[k]) + "</option>"; }).join("") +
+        '</select><button class="peq" id="ar-outra">🎲 Outra frase</button></div>' +
+        '<label class="marca-linha" style="font-weight:400"><input type="checkbox" id="ar-auto"' + (arte.campos.auto ? " checked" : "") + '> Trocar a frase sozinha todo dia (no tema escolhido)</label>' : "") +
       M.campos.map(function (f) {
         var longo = f[0] === "itens" || f[0] === "texto";
         return '<label for="ar-' + f[0] + '">' + esc(f[1]) + "</label>" + (longo ? '<textarea id="ar-' + f[0] + '" data-campo="' + f[0] + '" rows="3" maxlength="300"></textarea>' :
@@ -240,6 +258,14 @@
       i.oninput = function () { arte.campos[i.dataset.campo] = i.value; redesenhar(); };
     });
     $("#ar-fmt", c).onchange = function () { arte.formato = this.value; redesenhar(); };
+    if (arte.modelo === "frase") {
+      var porFrase = function () { $("#ar-texto", c).value = arte.campos.texto; arte.legendaEditada = false; redesenhar(); };
+      $("#ar-tema", c).onchange = function () { arte.campos.tema = this.value; arte.campos.salto = 0; fraseAutomatica(true); porFrase(); };
+      $("#ar-outra", c).onclick = function () { arte.campos.salto = (Number(arte.campos.salto) || 0) + 1; fraseAutomatica(true); porFrase(); };
+      $("#ar-auto", c).onchange = function () { arte.campos.auto = this.checked ? "1" : ""; if (this.checked) { fraseAutomatica(true); porFrase(); } else redesenhar(); };
+      // escreveu a própria frase: para de trocar sozinha, para não perder o texto
+      $("#ar-texto", c).addEventListener("input", function () { arte.campos.auto = ""; $("#ar-auto", c).checked = false; });
+    }
     $("#ar-limpar", c).onclick = function () {
       if (!window.confirm("Apagar o que foi escrito neste modelo e voltar ao exemplo?")) return;
       delete arte.por[arte.modelo]; abrirModelo(arte.modelo); salvarRasc(); verCriar(c);
