@@ -226,6 +226,9 @@ on conflict (id) do update set public = true, file_size_limit = 2097152, allowed
 drop policy if exists anuncia_logo_envia on storage.objects;
 create policy anuncia_logo_envia on storage.objects for insert to authenticated
   with check (bucket_id = 'logos' and (storage.foldername(name))[1] in (select id::text from public.empresas where dono = auth.uid()));
+drop policy if exists anuncia_logo_le on storage.objects;
+create policy anuncia_logo_le on storage.objects for select to authenticated
+  using (bucket_id = 'logos' and (storage.foldername(name))[1] in (select id::text from public.empresas where dono = auth.uid()));
 drop policy if exists anuncia_logo_troca on storage.objects;
 create policy anuncia_logo_troca on storage.objects for update to authenticated
   using (bucket_id = 'logos' and (storage.foldername(name))[1] in (select id::text from public.empresas where dono = auth.uid()));
