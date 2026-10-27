@@ -99,14 +99,16 @@
       im.src = u;
     });
   }
-  function opcoesRamo(atual) {
-    return '<option value="">Escolha o ramo</option>' + Object.keys(R.RAMOS).map(function (k) { return '<option' + (k === atual ? " selected" : "") + ">" + esc(k) + "</option>"; }).join("");
+  // campo do ramo: escolhe da lista ou digita um que não está nela
+  function campoRamo(id, atual) {
+    return '<input id="' + id + '" list="' + id + '-lista" maxlength="60" autocomplete="off" placeholder="Escolha da lista ou escreva o seu" value="' + esc(atual || "") + '">' +
+      '<datalist id="' + id + '-lista">' + Object.keys(R.RAMOS).map(function (k) { return '<option value="' + esc(k) + '"></option>'; }).join("") + "</datalist>";
   }
   function telaPrimeiroAcesso() {
     app.innerHTML = '<div class="entrada" style="max-width:520px"><div class="logo-g">Anuncia <span>Aí</span></div><form class="cartao" id="f-emp"><h2>Sua empresa</h2>' +
       '<p class="mudo peq">Esses dados aparecem nas artes. Você ganha <b>7 dias grátis</b> para testar.</p>' +
       '<label for="pe-nome">Nome da empresa *</label><input id="pe-nome" maxlength="120" required>' +
-      '<label for="pe-ramo">Ramo</label><select id="pe-ramo">' + opcoesRamo("") + "</select>" +
+      '<label for="pe-ramo">Ramo</label>' + campoRamo("pe-ramo", "") +
       '<div class="duas"><div><label for="pe-cid">Cidade</label><input id="pe-cid" maxlength="80"></div><div><label for="pe-zap">WhatsApp</label><input id="pe-zap" type="tel" maxlength="30" placeholder="(31) 99999-9999"></div></div>' +
       '<label for="pe-ig">Instagram</label><input id="pe-ig" maxlength="60" placeholder="@suaempresa">' +
       '<div id="pe-msg"></div><div class="acoes"><button class="prim" type="submit">Começar</button></div></form>' +
@@ -116,7 +118,7 @@
       ev.preventDefault();
       var b = $("button[type=submit]", this);
       A.ocupado(b, true, "Criando...");
-      q(sb.rpc("criar_empresa", { p_nome: $("#pe-nome").value.trim(), p_ramo: $("#pe-ramo").value || null, p_cidade: $("#pe-cid").value.trim() || null,
+      q(sb.rpc("criar_empresa", { p_nome: $("#pe-nome").value.trim(), p_ramo: $("#pe-ramo").value.trim() || null, p_cidade: $("#pe-cid").value.trim() || null,
         p_whatsapp: $("#pe-zap").value.trim() || null, p_instagram: $("#pe-ig").value.trim() || null })).then(function () { location.hash = "#marca"; return carregar(); })
         .catch(function (e) { A.ocupado(b, false); $("#pe-msg").innerHTML = '<div class="aviso erro">' + esc(A.msgErro(e)) + "</div>"; });
     };
@@ -215,7 +217,7 @@
   function verMarca(c) {
     c.innerHTML = '<div class="cartao"><h2>🏷️ Minha marca</h2><p class="mudo peq">O que aparece nas artes.</p>' +
       '<label for="mm-nome">Nome da empresa</label><input id="mm-nome" maxlength="120">' +
-      '<label for="mm-ramo">Ramo</label><select id="mm-ramo">' + opcoesRamo(E.ramo) + "</select>" +
+      '<label for="mm-ramo">Ramo</label>' + campoRamo("mm-ramo", E.ramo) +
       '<div class="duas"><div><label for="mm-cid">Cidade</label><input id="mm-cid" maxlength="80"></div><div><label for="mm-zap">WhatsApp</label><input id="mm-zap" type="tel" maxlength="30"></div></div>' +
       '<div class="duas"><div><label for="mm-ig">Instagram</label><input id="mm-ig" maxlength="60" placeholder="@suaempresa"></div><div><label for="mm-site">Site (opcional)</label><input id="mm-site" maxlength="120"></div></div>' +
       '<div class="duas"><div><label for="mm-cor1">Cor principal</label><input type="color" id="mm-cor1"></div><div><label for="mm-cor2">Cor de destaque</label><input type="color" id="mm-cor2"></div></div>' +
@@ -228,7 +230,7 @@
     $("#mm-site").value = E.site || ""; $("#mm-cor1").value = E.cor1 || "#7c3aed"; $("#mm-cor2").value = E.cor2 || "#f59e0b"; $("#mm-zapok").checked = E.aceita_whatsapp !== false;
     if (E.logo) $("#mm-logo-v").src = urlLogo();
     function salvar(extra) {
-      var p = Object.assign({ nome: $("#mm-nome").value.trim(), ramo: $("#mm-ramo").value, cidade: $("#mm-cid").value.trim(), whatsapp: $("#mm-zap").value.trim(),
+      var p = Object.assign({ nome: $("#mm-nome").value.trim(), ramo: $("#mm-ramo").value.trim(), cidade: $("#mm-cid").value.trim(), whatsapp: $("#mm-zap").value.trim(),
         instagram: $("#mm-ig").value.trim(), site: $("#mm-site").value.trim(), cor1: $("#mm-cor1").value, cor2: $("#mm-cor2").value, aceita_whatsapp: $("#mm-zapok").checked }, extra || {});
       return q(sb.rpc("salvar_perfil", { p: p })).then(function (n) { E = Array.isArray(n) ? n[0] : n; return carregarLogo(); });
     }

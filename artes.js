@@ -2,21 +2,68 @@
 (function () {
   "use strict";
   var FORMATOS = { post: [1080, 1350, "Post (feed)"], story: [1080, 1920, "Story / Status"], quadrado: [1080, 1080, "Quadrado"] };
+  // ramos com as hashtags da legenda; a empresa também pode digitar um ramo que não está aqui
   var RAMOS = {
     "Restaurante / Lanchonete": "#restaurante #comida #delivery #almoco #comidaboa",
+    "Pizzaria": "#pizzaria #pizza #delivery #noitedepizza",
+    "Hamburgueria": "#hamburgueria #hamburguer #burger #delivery",
+    "Açaí / Sorveteria": "#acai #sorveteria #sorvete #sobremesa",
+    "Marmitaria / Quentinhas": "#marmitaria #marmita #almoco #comidacaseira",
     "Padaria / Confeitaria": "#padaria #confeitaria #cafedamanha #doces #bolos",
-    "Salão de beleza / Barbearia": "#salaodebeleza #cabelo #barbearia #beleza #autoestima",
-    "Loja de roupas / Moda": "#moda #lookdodia #roupas #estilo #novidades",
+    "Doces e bolos caseiros": "#bolocaseiro #doces #encomendas #festa",
+    "Bar / Distribuidora de bebidas": "#bar #distribuidora #bebidas #happyhour",
     "Mercado / Mercearia": "#mercado #ofertas #promocao #economia",
-    "Pet shop / Veterinário": "#petshop #pets #cachorro #gato #banhoetosa",
-    "Oficina / Auto peças": "#oficina #mecanica #carros #autopecas",
-    "Prestador de serviço (elétrica, pintura, reformas)": "#reforma #eletricista #pintura #manutencao #obra",
+    "Hortifrúti / Açougue": "#hortifruti #acougue #carnes #frutas #verduras",
+    "Salão de beleza / Barbearia": "#salaodebeleza #cabelo #barbearia #beleza #autoestima",
+    "Manicure / Sobrancelhas / Cílios": "#manicure #unhas #sobrancelhas #cilios #beleza",
     "Saúde / Clínica / Estética": "#saude #estetica #bemestar #clinica",
+    "Farmácia / Drogaria": "#farmacia #drogaria #saude #cuidado",
+    "Ótica": "#otica #oculos #lentes #examedevista",
+    "Loja de roupas / Moda": "#moda #lookdodia #roupas #estilo #novidades",
+    "Calçados / Acessórios / Bolsas": "#calcados #acessorios #bolsas #moda",
+    "Papelaria / Presentes": "#papelaria #presentes #volteasaulas #lembrancinhas",
+    "Floricultura": "#floricultura #flores #presentes #buque",
+    "Loja de celulares / Informática": "#celulares #informatica #acessorios #tecnologia",
+    "Material de construção": "#materialdeconstrucao #obra #reforma #construcao",
+    "Eletricista": "#eletricista #instalacaoeletrica #manutencaoeletrica #quadrodeenergia #nr10",
+    "Pintura residencial e predial": "#pintura #pintor #pinturaresidencial #pinturapredial #reforma",
+    "Pintura industrial": "#pinturaindustrial #demarcacaodepiso #pisoepoxi #galpao #pinturaanticorrosiva",
+    "Fachadas e vidros (acesso por corda)": "#acessoporcorda #pinturadefachada #limpezadevidros #trabalhoemaltura #nr35",
+    "Reformas / Construção / Pedreiro": "#reforma #construcao #pedreiro #obra #acabamento",
+    "Gesso / Drywall": "#gesso #drywall #forrodegesso #sancas #reforma",
+    "Encanador / Hidráulica": "#encanador #hidraulica #vazamento #manutencao",
+    "Ar-condicionado / Refrigeração": "#arcondicionado #refrigeracao #instalacao #manutencaopreventiva",
+    "Marcenaria / Móveis planejados": "#marcenaria #moveisplanejados #moveissobmedida #decoracao",
+    "Serralheria / Vidraçaria": "#serralheria #vidracaria #portao #esquadrias #boxdebanheiro",
+    "Limpeza / Diarista": "#limpeza #diarista #faxina #casalimpa",
+    "Jardinagem / Paisagismo": "#jardinagem #paisagismo #jardim #plantas",
+    "Dedetização / Controle de pragas": "#dedetizacao #controledepragas #descupinizacao #higienizacao",
+    "Mudanças / Fretes": "#mudancas #fretes #carreto #transporte",
+    "Chaveiro": "#chaveiro #chaves #fechaduras #24horas",
+    "Assistência técnica (celular, eletrodomésticos)": "#assistenciatecnica #conserto #celular #eletrodomesticos",
+    "Prestador de serviço (elétrica, pintura, reformas)": "#reforma #eletricista #pintura #manutencao #obra",
+    "Oficina / Auto peças": "#oficina #mecanica #carros #autopecas",
+    "Lava-jato / Estética automotiva": "#lavajato #esteticaautomotiva #carrolimpo #polimento",
+    "Autoescola": "#autoescola #cnh #habilitacao #direcao",
+    "Pet shop / Veterinário": "#petshop #pets #cachorro #gato #banhoetosa",
     "Academia / Esportes": "#academia #treino #saude #fitness",
     "Educação / Cursos": "#cursos #educacao #aprender #aulas",
+    "Fotografia / Eventos / Festas": "#fotografia #eventos #festas #decoracaodefesta",
+    "Costura / Ajustes": "#costura #ajustes #costureira #sobmedida",
     "Imobiliária / Corretor": "#imoveis #casapropria #aluguel #corretor",
+    "Consórcio / Seguros / Crédito": "#consorcio #seguros #credito #casapropria #carronovo",
+    "Contabilidade / Escritório": "#contabilidade #contador #mei #empresas",
+    "Advocacia": "#advocacia #advogado #direito #consultajuridica",
+    "Turismo / Viagens": "#turismo #viagens #passeios #ferias",
     "Outro": "#empreendedorismo #negociolocal #compredopequeno"
   };
+  // ramo digitado pela empresa: vira hashtag junto com as de negócio local
+  function tagsRamo(ramo) {
+    if (RAMOS[ramo]) return RAMOS[ramo];
+    var t = String(ramo || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(function (w) { return w.length > 2; }).slice(0, 4);
+    var junto = t.length > 1 ? ["#" + t.join("")] : [];
+    return junto.concat(t.map(function (w) { return "#" + w; })).concat([RAMOS.Outro]).join(" ");
+  }
   var MODELOS = {
     promocao: { nome: "Promoção", ic: "🔥", fotos: 1, campos: [["titulo", "Produto ou serviço", "Pizza grande"], ["de", "Preço antes (opcional)", "59,90"], ["por", "Preço agora", "39,90"], ["detalhe", "Detalhe", "Só até domingo!"]] },
     novidade: { nome: "Novidade", ic: "✨", fotos: 1, campos: [["titulo", "Título", "Chegou novidade!"], ["texto", "Texto", "Venha conhecer a nova coleção"]] },
@@ -150,7 +197,7 @@
 
   function legenda(modelo, c, e) {
     e = e || {}; c = c || {};
-    var tags = (RAMOS[e.ramo] || RAMOS.Outro) + (e.cidade ? " #" + String(e.cidade).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase() : "");
+    var tags = tagsRamo(e.ramo) + (e.cidade ? " #" + String(e.cidade).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase() : "");
     var contato = [e.whatsapp ? "📲 WhatsApp: " + e.whatsapp : "", e.cidade ? "📍 " + e.cidade : ""].filter(Boolean).join("\n");
     var t;
     if (modelo === "promocao") t = "🔥 PROMOÇÃO: " + (c.titulo || "") + "\n" + (c.de ? "De R$ " + c.de + " por " : "Por ") + "R$ " + (c.por || "") + "!" + (c.detalhe ? "\n" + c.detalhe : "");
