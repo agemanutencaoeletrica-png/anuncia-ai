@@ -9,7 +9,7 @@ antes, por e-mail e WhatsApp.
 |---|---|---|
 | `index.html` | Público | Site de apresentação com exemplos e preços |
 | `app.html` | Empresas clientes | Criar conta (7 dias grátis), minha marca, criar artes, assinatura |
-| `admin.html` | Você (dono) | Empresas, quem vence, pagamentos, avisos enviados, preços, +dias/bloquear |
+| `admin.html` | Você (dono) | Empresas, quem vence, pagamentos, avisos enviados, sugestões dos clientes, preços, +dias/bloquear |
 
 Custo para começar: **R$ 0** (Supabase grátis, GitHub Pages grátis, Brevo grátis até 300 e-mails/dia).
 O Mercado Pago cobra a taxa dele sobre cada pagamento recebido.
@@ -25,6 +25,9 @@ O Mercado Pago cobra a taxa dele sobre cada pagamento recebido.
 - **Avisos automáticos:** 5, 3 e 1 dia antes do vencimento (cartão: só na véspera) e no bloqueio. Cada aviso sai uma vez só.
 - **Pagou → libera na hora** (o Mercado Pago avisa o sistema). **Venceu sem pagar → bloqueia** no dia (cartão: depois dos 3 dias).
 - Bloqueada, a empresa só vê a tela de pagamento.
+
+**Sugestões dos clientes:** a aba “💡 Sugestões” do app grava a mensagem para você ler e responder no painel
+(aba “Sugestões”). Em instalação que já existia, rode uma vez o `supabase/sugestoes.sql` no SQL Editor.
 
 ---
 
