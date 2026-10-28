@@ -297,6 +297,7 @@
         if (!window.confirm("Publicar esta arte e a legenda no Telegram " + st.canal + "?")) return;
         A.ocupado(b, true, "Publicando...");
         A.funcao(sb, "telegram", { acao: "publicar", foto: $("#cv-arte").toDataURL("image/jpeg", 0.9), legenda: $("#ar-leg").value }).then(function (r) {
+          if (!r || r.ok !== true) throw new Error(ERRO_FUNCAO_TG);
           A.ocupado(b, false); A.avisar("Publicado no Telegram ✅", "ok");
           if (r.link && window.confirm("Publicado! Abrir o post no Telegram?")) window.open(r.link, "_blank", "noopener");
         }).catch(function (e) { A.ocupado(b, false); A.avisar(A.msgErro(e), "erro"); });
@@ -361,6 +362,8 @@
 
   // ---------- Telegram: o robô da empresa publica a arte no canal dela ----------
   var TG = null; // { configurado, canal }
+  // resposta sem "ok": a função "telegram" do servidor não é a do Anuncia Aí (ex.: ficou o código de exemplo do Supabase)
+  var ERRO_FUNCAO_TG = "A função \"telegram\" do servidor não respondeu como esperado. No Supabase, abra Edge Functions → telegram → Code e cole de novo o arquivo supabase/functions/telegram/index.ts (depois Deploy).";
   function statusTelegram() {
     if (TG) return Promise.resolve(TG);
     return q(sb.rpc("telegram_status")).then(function (r) { TG = r || { configurado: false }; return TG; })
@@ -391,6 +394,7 @@
       if ($("#tg-testar", el)) $("#tg-testar", el).onclick = function () {
         var b = this; A.ocupado(b, true, "Testando...");
         A.funcao(sb, "telegram", { acao: "testar" }).then(function (r) {
+          if (!r || r.ok !== true || !r.robo) throw new Error(ERRO_FUNCAO_TG);
           A.ocupado(b, false); msg("✅ Tudo certo: o robô <b>" + esc(r.robo) + "</b> pode publicar em <b>" + esc(r.canal) + "</b>.", "ok");
         }).catch(function (e) { A.ocupado(b, false); msg(esc(A.msgErro(e)), "erro"); });
       };
