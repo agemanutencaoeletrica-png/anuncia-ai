@@ -249,7 +249,7 @@
       '<p class="mudo peq" style="margin-top:8px">💾 O que você escreve fica salvo neste aparelho, em cada modelo. <button class="texto peq" id="ar-limpar">🧹 Limpar este modelo</button></p></div>' +
       '<div><div class="previa cartao" style="padding:10px"><canvas id="cv-arte" aria-label="Prévia da arte"></canvas></div>' +
       '<div class="acoes" style="margin-top:0">' + (podeCompartilhar() ? '<button class="prim" id="ar-postar">📤 Postar (Instagram, Facebook, WhatsApp, Telegram...)</button>' : "") +
-      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
+      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><a id="ar-tg-ver" class="botao oculto" target="_blank" rel="noopener">👁 Ver publicação no Telegram</a><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
       '<p class="mudo peq">No Instagram a legenda não vai junto automaticamente: ela já fica copiada, é só colar no post.</p></div></div>';
     $$("[data-modelo]", c).forEach(function (b) {
       b.onclick = function () { guardarAtual(); abrirModelo(b.dataset.modelo); salvarRasc(); verCriar(c); };
@@ -299,7 +299,10 @@
         A.funcao(sb, "telegram", { acao: "publicar", foto: $("#cv-arte").toDataURL("image/jpeg", 0.9), legenda: $("#ar-leg").value }).then(function (r) {
           if (!r || r.ok !== true) throw new Error(ERRO_FUNCAO_TG);
           A.ocupado(b, false); A.avisar("Publicado no Telegram ✅", "ok");
-          if (r.link && window.confirm("Publicado! Abrir o post no Telegram?")) window.open(r.link, "_blank", "noopener");
+          // botão fica na tela para conferir o post (canal privado não tem link: abre o canal)
+          var ver = $("#ar-tg-ver", c), canal = String(st.canal || "");
+          ver.href = r.link || (canal.charAt(0) === "@" ? "https://t.me/" + canal.slice(1) : "https://t.me/");
+          ver.classList.remove("oculto");
         }).catch(function (e) { A.ocupado(b, false); A.avisar(A.msgErro(e), "erro"); });
       };
     });
