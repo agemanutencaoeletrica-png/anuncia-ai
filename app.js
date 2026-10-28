@@ -377,11 +377,12 @@
         '<li>No seu canal: <b>Administradores → Adicionar administrador</b>, procure o robô e deixe ligada a permissão <b>Publicar mensagens</b>.</li>' +
         '<li>Escreva o @ do canal abaixo, salve e toque em <b>Testar</b>.</li></ol>' +
         '<p class="peq mudo">🔒 O código do robô fica guardado só no servidor: depois de salvo, nem o app consegue ver. Não mande esse código para ninguém.</p></details>' +
-        '<div class="duas"><div><label for="tg-canal">Canal ou grupo</label><input id="tg-canal" maxlength="80" placeholder="@seucanal ou t.me/seucanal" value="' + esc(st.canal || "") + '"></div>' +
-        '<div><label for="tg-token">Código do robô</label><input id="tg-token" type="password" autocomplete="off" maxlength="80" placeholder="' + (st.configurado ? "já salvo (cole só para trocar)" : "123456789:ABC...") + '"></div></div>' +
+        '<div class="duas"><div><label for="tg-canal">Canal ou grupo</label><input id="tg-canal" name="tg-canal" maxlength="80" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seucanal ou t.me/seucanal" value="' + esc(st.canal || "") + '"></div>' +
+        '<div><label for="tg-token">Código do robô</label><input id="tg-token" name="tg-codigo-robo" type="password" autocomplete="new-password" data-lpignore="true" maxlength="80" placeholder="' + (st.configurado ? "já salvo (cole só para trocar)" : "123456789:ABC...") + '"></div></div>' +
         '<div id="tg-msg"></div><div class="acoes"><button class="prim" id="tg-salvar">Salvar</button>' + (st.configurado ? '<button id="tg-testar">🔎 Testar</button><button class="perigo" id="tg-remover">Desligar</button>' : "") + "</div>";
       var msg = function (t, tipo) { $("#tg-msg", el).innerHTML = '<div class="aviso ' + (tipo || "") + '">' + t + "</div>"; };
       $("#tg-salvar", el).onclick = function () {
+        if (/@.*\./.test($("#tg-canal", el).value)) { msg("Isso é um e-mail. No canal, escreva o @ do canal do Telegram (ex.: @ageeletricaepintura). O navegador pode ter preenchido sozinho: confira também o código do robô.", "erro"); return; }
         var b = this; A.ocupado(b, true, "Salvando...");
         q(sb.rpc("salvar_telegram", { p_canal: $("#tg-canal", el).value, p_token: $("#tg-token", el).value })).then(function (r) {
           TG = r; A.avisar("Telegram salvo", "ok"); verTelegram(el);
