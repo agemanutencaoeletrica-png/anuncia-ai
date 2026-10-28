@@ -381,8 +381,11 @@
         '<li>Escreva o @ do canal abaixo, salve e toque em <b>Testar</b>.</li></ol>' +
         '<p class="peq mudo">🔒 O código do robô fica guardado só no servidor: depois de salvo, nem o app consegue ver. Não mande esse código para ninguém.</p></details>' +
         '<div class="duas"><div><label for="tg-canal">Canal ou grupo</label><input id="tg-canal" name="tg-canal" maxlength="80" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seucanal ou t.me/seucanal" value="' + esc(st.canal || "") + '"></div>' +
-        '<div><label for="tg-token">Código do robô</label><input id="tg-token" name="tg-codigo-robo" type="password" autocomplete="new-password" data-lpignore="true" maxlength="80" placeholder="' + (st.configurado ? "já salvo (cole só para trocar)" : "123456789:ABC...") + '"></div></div>' +
+        '<div><label for="tg-token">Código do robô</label><div style="position:relative"><input id="tg-token" name="tg-codigo-robo" type="password" autocomplete="new-password" data-lpignore="true" maxlength="80" style="padding-right:52px" placeholder="' + (st.configurado ? "já salvo (cole só para trocar)" : "123456789:ABC...") + '"><button type="button" class="texto" data-ver-senha="tg-token" aria-label="Mostrar o código" style="position:absolute;right:2px;top:50%;transform:translateY(-50%);font-size:20px">👁</button></div></div></div>' +
         '<div id="tg-msg"></div><div class="acoes"><button class="prim" id="tg-salvar">Salvar</button>' + (st.configurado ? '<button id="tg-testar">🔎 Testar</button><button class="perigo" id="tg-remover">Desligar</button>' : "") + "</div>";
+      A.ligarVerSenha(el);
+      // o código salvo nunca volta do servidor: se o campo aparecer preenchido, foi o navegador (senha do login)
+      setTimeout(function () { var t = $("#tg-token", el); if (t && t.value && st.configurado) $("#tg-msg", el).innerHTML = '<div class="aviso peq">⚠ O navegador preencheu o campo do código sozinho (pode ser a senha do seu login). O código certo já está salvo: apague esse campo antes de salvar de novo.</div>'; }, 800);
       var msg = function (t, tipo) { $("#tg-msg", el).innerHTML = '<div class="aviso ' + (tipo || "") + '">' + t + "</div>"; };
       $("#tg-salvar", el).onclick = function () {
         if (/@.*\./.test($("#tg-canal", el).value)) { msg("Isso é um e-mail. No canal, escreva o @ do canal do Telegram (ex.: @ageeletricaepintura). O navegador pode ter preenchido sozinho: confira também o código do robô.", "erro"); return; }
