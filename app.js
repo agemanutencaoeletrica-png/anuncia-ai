@@ -76,6 +76,7 @@
   // ---------- dados ----------
   function carregar() {
     app.innerHTML = '<div class="vazio"><span class="carregando"></span> Carregando...</div>';
+    TG = null;
     // filtra pelo dono: o login do administrador enxerga todas as empresas
     return sb.auth.getUser().then(function (u) {
       var uid = u.data && u.data.user && u.data.user.id;
@@ -248,7 +249,7 @@
       '<p class="mudo peq" style="margin-top:8px">💾 O que você escreve fica salvo neste aparelho, em cada modelo. <button class="texto peq" id="ar-limpar">🧹 Limpar este modelo</button></p></div>' +
       '<div><div class="previa cartao" style="padding:10px"><canvas id="cv-arte" aria-label="Prévia da arte"></canvas></div>' +
       '<div class="acoes" style="margin-top:0">' + (podeCompartilhar() ? '<button class="prim" id="ar-postar">📤 Postar (Instagram, Facebook, WhatsApp, Telegram...)</button>' : "") +
-      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button></div>' +
+      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
       '<p class="mudo peq">No Instagram a legenda não vai junto automaticamente: ela já fica copiada, é só colar no post.</p></div></div>';
     $$("[data-modelo]", c).forEach(function (b) {
       b.onclick = function () { guardarAtual(); abrirModelo(b.dataset.modelo); salvarRasc(); verCriar(c); };
@@ -289,6 +290,18 @@
     function nome() { return "anuncia-ai-" + arte.modelo + "-" + Date.now() + ".jpg"; }
     $("#ar-baixar", c).onclick = function () { blob().then(function (b) { A.baixar(b, nome()); A.copiar($("#ar-leg").value, "Imagem baixada e legenda copiada."); }); };
     $("#ar-copiar", c).onclick = function () { A.copiar($("#ar-leg").value, "Legenda copiada."); };
+    statusTelegram().then(function (st) {
+      var b = $("#ar-tg", c); if (!b) return;
+      if (st.configurado) { b.classList.remove("oculto"); b.textContent = "📢 Publicar no Telegram (" + st.canal + ")"; }
+      b.onclick = function () {
+        if (!window.confirm("Publicar esta arte e a legenda no Telegram " + st.canal + "?")) return;
+        A.ocupado(b, true, "Publicando...");
+        A.funcao(sb, "telegram", { acao: "publicar", foto: $("#cv-arte").toDataURL("image/jpeg", 0.9), legenda: $("#ar-leg").value }).then(function (r) {
+          A.ocupado(b, false); A.avisar("Publicado no Telegram ✅", "ok");
+          if (r.link && window.confirm("Publicado! Abrir o post no Telegram?")) window.open(r.link, "_blank", "noopener");
+        }).catch(function (e) { A.ocupado(b, false); A.avisar(A.msgErro(e), "erro"); });
+      };
+    });
     if ($("#ar-postar", c)) $("#ar-postar", c).onclick = function () {
       var t = $("#ar-leg").value;
       A.copiar(t, "Legenda copiada").then(blob).then(function (b) {
@@ -311,7 +324,9 @@
       '<label class="botao peq" style="margin:0;cursor:pointer">📁 Enviar logo (PNG ou JPG)<input type="file" accept="image/png,image/jpeg,image/webp" id="mm-logo" class="oculto"></label>' +
       (E.logo ? '<button class="peq" id="mm-tira">Tirar logo</button>' : "") + "</div>" +
       '<label class="marca-linha" style="font-weight:400"><input type="checkbox" id="mm-zapok"> Receber avisos de cobrança no WhatsApp</label>' +
-      '<div id="mm-msg"></div><div class="acoes"><button class="prim" id="mm-salvar">Salvar</button></div></div>';
+      '<div id="mm-msg"></div><div class="acoes"><button class="prim" id="mm-salvar">Salvar</button></div></div>' +
+      '<div class="cartao" id="mm-tg"><h2>📢 Telegram</h2><div class="mudo peq">Carregando...</div></div>';
+    verTelegram($("#mm-tg", c));
     $("#mm-nome").value = E.nome || ""; $("#mm-cid").value = E.cidade || ""; $("#mm-zap").value = E.whatsapp || ""; $("#mm-ig").value = E.instagram || "";
     $("#mm-site").value = E.site || ""; $("#mm-cor1").value = E.cor1 || "#7c3aed"; $("#mm-cor2").value = E.cor2 || "#f59e0b"; $("#mm-zapok").checked = E.aceita_whatsapp !== false;
     if (E.logo) $("#mm-logo-v").src = urlLogo();
@@ -342,6 +357,47 @@
       };
       im.src = URL.createObjectURL(f);
     };
+  }
+
+  // ---------- Telegram: o robô da empresa publica a arte no canal dela ----------
+  var TG = null; // { configurado, canal }
+  function statusTelegram() {
+    if (TG) return Promise.resolve(TG);
+    return q(sb.rpc("telegram_status")).then(function (r) { TG = r || { configurado: false }; return TG; })
+      .catch(function () { TG = { configurado: false, indisponivel: true }; return TG; });
+  }
+  function verTelegram(el) {
+    statusTelegram().then(function (st) {
+      if (st.indisponivel) { el.innerHTML = '<h2>📢 Telegram</h2><div class="aviso peq">A publicação no Telegram ainda não foi ativada no servidor.</div>'; return; }
+      el.innerHTML = '<h2>📢 Telegram</h2><p class="mudo peq">Publique a arte direto no seu canal ou grupo do Telegram, com um clique em Criar arte.</p>' +
+        (st.configurado ? '<div class="aviso ok peq">✅ Ligado ao canal <b>' + esc(st.canal) + "</b></div>" : "") +
+        '<details' + (st.configurado ? "" : " open") + '><summary class="peq" style="cursor:pointer;font-weight:700">Como ligar (uma vez, uns 5 minutos)</summary><ol class="peq">' +
+        '<li>No Telegram, abra o <b>@BotFather</b>, envie <b>/newbot</b> e escolha um nome (ex.: “Minha Empresa Posts”) e um usuário que termine em <b>bot</b>.</li>' +
+        '<li>O @BotFather responde com o <b>código do robô</b> (números, dois-pontos e letras). Copie e cole abaixo.</li>' +
+        '<li>No seu canal: <b>Administradores → Adicionar administrador</b>, procure o robô e deixe ligada a permissão <b>Publicar mensagens</b>.</li>' +
+        '<li>Escreva o @ do canal abaixo, salve e toque em <b>Testar</b>.</li></ol>' +
+        '<p class="peq mudo">🔒 O código do robô fica guardado só no servidor: depois de salvo, nem o app consegue ver. Não mande esse código para ninguém.</p></details>' +
+        '<div class="duas"><div><label for="tg-canal">Canal ou grupo</label><input id="tg-canal" maxlength="80" placeholder="@seucanal ou t.me/seucanal" value="' + esc(st.canal || "") + '"></div>' +
+        '<div><label for="tg-token">Código do robô</label><input id="tg-token" type="password" autocomplete="off" maxlength="80" placeholder="' + (st.configurado ? "já salvo (cole só para trocar)" : "123456789:ABC...") + '"></div></div>' +
+        '<div id="tg-msg"></div><div class="acoes"><button class="prim" id="tg-salvar">Salvar</button>' + (st.configurado ? '<button id="tg-testar">🔎 Testar</button><button class="perigo" id="tg-remover">Desligar</button>' : "") + "</div>";
+      var msg = function (t, tipo) { $("#tg-msg", el).innerHTML = '<div class="aviso ' + (tipo || "") + '">' + t + "</div>"; };
+      $("#tg-salvar", el).onclick = function () {
+        var b = this; A.ocupado(b, true, "Salvando...");
+        q(sb.rpc("salvar_telegram", { p_canal: $("#tg-canal", el).value, p_token: $("#tg-token", el).value })).then(function (r) {
+          TG = r; A.avisar("Telegram salvo", "ok"); verTelegram(el);
+        }).catch(function (e) { A.ocupado(b, false); msg(esc(A.msgErro(e)), "erro"); });
+      };
+      if ($("#tg-testar", el)) $("#tg-testar", el).onclick = function () {
+        var b = this; A.ocupado(b, true, "Testando...");
+        A.funcao(sb, "telegram", { acao: "testar" }).then(function (r) {
+          A.ocupado(b, false); msg("✅ Tudo certo: o robô <b>" + esc(r.robo) + "</b> pode publicar em <b>" + esc(r.canal) + "</b>.", "ok");
+        }).catch(function (e) { A.ocupado(b, false); msg(esc(A.msgErro(e)), "erro"); });
+      };
+      if ($("#tg-remover", el)) $("#tg-remover", el).onclick = function () {
+        if (!window.confirm("Desligar o Telegram? O código do robô será apagado do servidor.")) return;
+        q(sb.rpc("remover_telegram")).then(function () { TG = { configurado: false }; verTelegram(el); }).catch(function (e) { msg(esc(A.msgErro(e)), "erro"); });
+      };
+    });
   }
 
   // ---------- sugestões ----------

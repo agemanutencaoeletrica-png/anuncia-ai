@@ -55,13 +55,17 @@ O Mercado Pago cobra a taxa dele sobre cada pagamento recebido.
 5. Para testar sem dinheiro de verdade, use as **credenciais de teste** (o token de teste também começa com `APP_USR-`).
 
 ### 3. Funções do servidor (Supabase → Edge Functions)
-Crie 3 funções (**Deploy a new function → Via Editor**), colando o arquivo `index.ts` de cada pasta:
+Crie 4 funções (**Deploy a new function → Via Editor**), colando o arquivo `index.ts` de cada pasta:
 
 | Nome da função | Arquivo | Verify JWT |
 |---|---|---|
 | `assinar` | `supabase/functions/assinar/index.ts` | **desligado** (a função confere o login) |
 | `mp-webhook` | `supabase/functions/mp-webhook/index.ts` | **desligado** (quem chama é o Mercado Pago) |
 | `cobranca-diaria` | `supabase/functions/cobranca-diaria/index.ts` | **desligado** (protegida pelo CRON_SECRET) |
+| `telegram` | `supabase/functions/telegram/index.ts` | **desligado** (a função confere o login) |
+
+**Publicar no Telegram:** em instalação que já existia, rode uma vez o `supabase/telegram.sql` e crie a função `telegram`.
+Cada empresa liga o próprio robô (do @BotFather) e o canal em **Minha marca**; o código do robô fica numa tabela que o app não lê.
 
 ### 4. E-mail dos avisos (Brevo, grátis)
 1. <https://www.brevo.com> → crie a conta → **Senders** → adicione e confirme o e-mail remetente (ex.: o Gmail da empresa).
