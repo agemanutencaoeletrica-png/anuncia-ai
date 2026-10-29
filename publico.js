@@ -75,8 +75,9 @@
   }
   // botões de divulgar: WhatsApp (grupos e contatos), Facebook, Telegram, copiar e QR Code
   function htmlDivulgar(pref) {
-    return '<div class="acoes" style="margin-top:8px"><a class="botao zap" id="' + pref + '-zap" target="_blank" rel="noopener">💬 WhatsApp (grupos)</a><a class="botao" id="' + pref + '-fb" target="_blank" rel="noopener">📘 Facebook</a>' +
-      '<a class="botao" id="' + pref + '-tg" target="_blank" rel="noopener">✈️ Telegram</a><button id="' + pref + '-copiar">📋 Copiar mensagem</button><button id="' + pref + '-link">🔗 Copiar link</button><button id="' + pref + '-qr">🔳 QR Code</button></div>';
+    return '<div class="acoes" style="margin-top:8px"><a class="botao zap" id="' + pref + '-zap" target="_blank" rel="noopener">💬 Enviar no WhatsApp</a><a class="botao" id="' + pref + '-fb" target="_blank" rel="noopener">📘 Facebook</a>' +
+      '<a class="botao" id="' + pref + '-tg" target="_blank" rel="noopener">✈️ Telegram</a><button id="' + pref + '-copiar">📋 Copiar mensagem</button><button id="' + pref + '-link">🔗 Copiar link</button><button id="' + pref + '-qr">🔳 QR Code</button>' +
+      (navigator.share ? '<button id="' + pref + '-mais" title="Instagram, Status, e-mail, SMS e outros apps do aparelho">📲 Outros apps</button>' : "") + "</div>";
   }
   var qrPronto = null;
   function carregarQr() {
@@ -100,6 +101,9 @@
     atualizar(); [zap, fb, tg].forEach(function (a) { a.addEventListener("click", atualizar); });
     raiz.querySelector("#" + pref + "-copiar").onclick = function () { A.copiar(txt(), "Mensagem copiada: cole no grupo"); };
     raiz.querySelector("#" + pref + "-link").onclick = function () { A.copiar(link, "Link copiado"); };
+    // 📲 a janela de compartilhar do aparelho: Instagram (Direct), Status, e-mail, SMS, Messenger...
+    var mais = raiz.querySelector("#" + pref + "-mais");
+    if (mais) mais.onclick = function () { A.copiar(txt(), "Mensagem copiada"); navigator.share({ title: c.nome, text: txt() }).catch(function () { /* fechou: a mensagem já está copiada */ }); };
     raiz.querySelector("#" + pref + "-qr").onclick = function () {
       var b = this; A.ocupado(b, true, "Gerando...");
       carregarQr().then(function (Q) {
@@ -176,7 +180,7 @@
           return '<button class="arte-mini" data-arte="' + n + '"><img loading="lazy" alt="' + esc(String(a.legenda || "Arte de " + v.nome).slice(0, 120)) + '" src="' + esc(urlPub("vitrine", a.caminho)) + '"></button>';
         }).join("") + "</div>" : "") +
         ((v.parceiros || []).length ? '<h2 style="margin:18px 0 10px">🤝 Recomendamos</h2><div class="emp-grade">' + v.parceiros.map(cartaoEmpresa).join("") + "</div>" : "") +
-        '<div class="cartao" style="margin-top:14px"><h2>📤 Divulgue ' + esc(v.nome) + '</h2><p class="peq mudo" style="margin:4px 0 0">Mande para os seus grupos e contatos: vai a mensagem com todos os links.</p>' + htmlDivulgar("vd") + "</div>" +
+        '<div class="cartao" style="margin-top:14px"><h2>📤 Divulgue ' + esc(v.nome) + '</h2><p class="peq mudo" style="margin:4px 0 0">Mande no WhatsApp (contatos, grupos e status), Facebook, Telegram, Instagram ou onde preferir: vai a mensagem com todos os links.</p>' + htmlDivulgar("vd") + "</div>" +
         htmlConvite() +
         '<p class="mudo peq" style="text-align:center;margin-top:22px"><a href="guia.html' + (v.cidade ? "?cidade=" + encodeURIComponent(v.cidade) : "") + '">🗺️ Mais empresas' + (v.cidade ? " em " + esc(v.cidade) : "") + "</a> · " +
         '<a href="index.html">Crie a vitrine da sua empresa no Anuncia Aí</a></p></main>';

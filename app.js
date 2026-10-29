@@ -422,7 +422,7 @@
       "<li>Pronto no Google: abra o seu perfil no Google Maps, toque em <b>Compartilhar</b>, copie o link e cole aqui em cima. Na sua vitrine aparece o botão ⭐ Avaliações no Google.</li></ol></details>" +
       '<div id="cm-msg"></div><div class="acoes"><button class="prim" id="cm-salvar">Salvar</button>' +
       (E.vitrine && link ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(link) + '">👁 Ver minha vitrine</a><button id="cm-copiar">📋 Copiar link</button>' : "") + "</div>" +
-      (E.vitrine && link ? '<h3 style="margin-top:16px">📤 Divulgar minha vitrine</h3><p class="mudo peq" style="margin:2px 0 6px">Mensagem pronta com todos os seus links, para grupos de WhatsApp, Facebook, Telegram e onde quiser. Pode editar antes de mandar.</p>' +
+      (E.vitrine && link ? '<h3 style="margin-top:16px">📤 Divulgar minha vitrine</h3><p class="mudo peq" style="margin:2px 0 6px">Mensagem pronta com todos os seus links, para enviar no WhatsApp (contatos, grupos e status), Facebook, Telegram, Instagram e onde preferir. Pode editar antes de mandar.</p>' +
         '<textarea id="cm-msg-div" rows="9"></textarea>' + P.htmlDivulgar("cd") : "") +
       (E.vitrine ? '<h3 style="margin-top:16px">Artes na vitrine</h3><p class="mudo peq">Em 🎨 Criar arte, toque em <b>📌 Pôr na minha vitrine</b>. Ficam as 12 mais novas.</p><div id="cm-artes" class="artes-grade"><span class="mudo peq">Carregando...</span></div>' : "") + "</div>" +
       '<div class="cartao" id="cm-rede"><h2>🤝 Minha rede</h2>' + (E.vitrine ? '<div class="mudo peq">Carregando...</div>' :
