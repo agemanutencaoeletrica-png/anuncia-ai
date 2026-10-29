@@ -1,6 +1,6 @@
 // Service worker do Anuncia Aí: sempre confere a versão nova no servidor;
 // sem internet, abre a última cópia guardada. Dados e pagamentos nunca ficam aqui.
-var CACHE = "anuncia-v25";
+var CACHE = "anuncia-v26";
 var BASICOS = ["./index.html", "./app.html", "./estilo.css", "./comum.js", "./artes.js", "./app.js", "./publico.js", "./vitrine.html", "./guia.html", "./config.js", "./icone.svg", "./manifest.webmanifest"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(BASICOS); }).then(function () { return self.skipWaiting(); }));
@@ -11,7 +11,8 @@ self.addEventListener("activate", function (e) {
 });
 self.addEventListener("fetch", function (e) {
   var r = e.request;
-  if (r.method !== "GET" || new URL(r.url).origin !== self.location.origin) return;
+  var u = new URL(r.url);
+  if (r.method !== "GET" || u.origin !== self.location.origin || /\/(rest|auth|storage|functions)\/v1\//.test(u.pathname)) return;  // API nunca passa pelo cache
   e.respondWith(fetch(r.url, { cache: "no-cache", credentials: "same-origin" }).then(function (resp) {
     if (resp.ok) { var c = resp.clone(); caches.open(CACHE).then(function (k) { k.put(r, c); }); }
     return resp;

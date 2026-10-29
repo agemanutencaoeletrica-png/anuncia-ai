@@ -122,3 +122,10 @@ Site: `https://SEU-USUARIO.github.io/anuncia-ai/` · App: `.../app.html` · Pain
 - A empresa **não consegue se liberar**: validade, situação e pagamentos só mudam pelo servidor ou pelo dono.
 - O webhook **não confia no aviso**: busca o pagamento direto no Mercado Pago com o seu token antes de liberar.
 - O token do Mercado Pago, a chave do Brevo e a do WhatsApp ficam só nos segredos do Supabase.
+
+## 🎁 Indique e ganhe
+- Rode uma vez o `supabase/indicacoes.sql` no SQL Editor do Supabase (já está também no final do `schema.sql`).
+- Cada empresa tem um **código** e um **link** (`index.html?ind=CÓDIGO`) na aba **🎁 Indique e ganhe**, com botão para enviar no WhatsApp e campo da **chave Pix** para receber.
+- Quem entra pelo link (ou digita o código no cadastro, até 30 dias e antes do primeiro pagamento) fica ligado a quem indicou.
+- Quando o indicado faz o **primeiro pagamento aprovado**, a indicação fica **a pagar** com o valor das regras (padrão R$ 10,00).
+- No painel do dono, aba **🎁 Indicações**: quem indicou, chave Pix, indicado, situação e valor; **✅ Paguei** depois de pagar no Pix. Valor, ativo/pausado e texto das regras ficam na mesma aba.

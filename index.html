@@ -50,6 +50,18 @@
 <script src="artes.js"></script>
 <script src="publico.js"></script>
 <script>
+// 🎁 link de indicação (index.html?ind=CODIGO): guarda o código e mostra a faixa de boas-vindas; o app usa ao criar a empresa
+(function () {
+  var c = (new URLSearchParams(location.search).get("ind") || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 12);
+  if (!c) return;
+  try { localStorage.setItem("anuncia_indicacao", c); } catch (e) { /* sem armazenamento */ }
+  var f = document.createElement("div");
+  f.style.cssText = "background:#16a34a;color:#fff;text-align:center;padding:12px 16px;font-weight:700";
+  f.innerHTML = "🎁 Você foi indicado! Crie sua conta e ganhe 7 dias grátis. <a href=\"app.html?ind=" + c + "\" style=\"color:#fff;text-decoration:underline\">Começar agora</a>";
+  document.body.insertBefore(f, document.body.firstChild);
+})();
+</script>
+<script>
 (function () {
   var A = window.AN, R = window.AN_ARTES;
   var ex = [
