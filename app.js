@@ -85,7 +85,7 @@
     }).then(function (r) {
       PLANOS = r[1] || [];
       if (!r[0] || !r[0].length) { telaPrimeiroAcesso(); return; }
-      E = r[0][0]; carregarLogo(); montar();
+      E = r[0][0]; carregarLogo(); montar(); conferirRespostas();
     }).catch(function (e) { telaLogin(A.msgErro(e)); });
   }
   function urlLogo() { return E.logo ? sb.storage.from("logos").getPublicUrl(E.logo).data.publicUrl : null; }
@@ -146,7 +146,7 @@
     if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "criar";
     if (A.situacao(E).bloqueada && aba !== "assinatura" && aba !== "sugestoes" && aba !== "mais") aba = "assinatura";
     if (vigiaPix && aba !== "assinatura") { clearInterval(vigiaPix); vigiaPix = null; }
-    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + "</a>"; }).join("");
+    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" && RESP_NOVAS ? '<span class="bolinha">' + RESP_NOVAS + "</span>" : "") + "</a>"; }).join("");
     faixa();
     var c = $("#conteudo");
     ({ criar: verCriar, marca: verMarca, comunidade: verComunidade, assinatura: verAssinatura, sugestoes: verSugestoes, mais: verMais })[aba](c);
@@ -625,6 +625,17 @@
   }
 
   // ---------- sugestões ----------
+  // resposta nova da equipe: bolinha vermelha na aba até o cliente abrir e ver (guardado neste aparelho)
+  var RESP_NOVAS = 0;
+  function chaveResp() { return "anuncia_resp_vistas_" + E.id; }
+  function respVistas() { try { return JSON.parse(localStorage.getItem(chaveResp()) || "{}"); } catch (e) { return {}; } }
+  function marcaResp(x) { return x.id + ":" + String(x.resposta || "").length; }
+  function conferirRespostas() {
+    q(sb.from("sugestoes").select("id,resposta").eq("empresa_id", E.id).limit(50)).then(function (ls) {
+      var v = respVistas(); RESP_NOVAS = ls.filter(function (x) { return x.resposta && !v[marcaResp(x)]; }).length;
+      if (RESP_NOVAS && location.hash.slice(1) !== "sugestoes") { rota(); A.avisar("💬 A equipe do Anuncia Aí respondeu a sua mensagem. Veja em 💡 Sugestões.", "ok"); }
+    }).catch(function () { /* sugestões ainda não ativas */ });
+  }
   var TIPOS_SUG = { sugestao: "💡 Sugestão", problema: "⚠️ Problema", elogio: "👏 Elogio" };
   function verSugestoes(c) {
     var zap = A.CFG.SUPORTE_WHATSAPP;
@@ -638,12 +649,18 @@
     if ($("#sg-zap")) $("#sg-zap").onclick = function () { this.href = A.linkZap(zap, textoZap()); };
     function lista() {
       q(sb.from("sugestoes").select("*").eq("empresa_id", E.id).order("criado_em", { ascending: false }).limit(30)).then(function (ls) {
+        var v = respVistas();
         $("#sg-lista").innerHTML = ls.length ? ls.map(function (x) {
-          return '<div style="padding:10px 0;border-top:1px solid var(--borda)"><span class="selo">' + esc(TIPOS_SUG[x.tipo] || x.tipo) + "</span> " +
+          var nova = x.resposta && !v[marcaResp(x)];
+          return '<div style="padding:10px 0;border-top:1px solid var(--borda)"' + (nova ? ' class="sug-nova"' : "") + '><span class="selo">' + esc(TIPOS_SUG[x.tipo] || x.tipo) + "</span> " + (nova ? '<span class="selo critico">🔴 resposta nova</span> ' : "") +
             '<span class="peq mudo">' + A.dataHora(x.criado_em) + "</span> " + (x.lida ? '<span class="selo bom">lida</span>' : '<span class="selo atencao">enviada</span>') +
             '<div style="margin-top:6px;white-space:pre-wrap">' + esc(x.texto) + "</div>" +
             (x.resposta ? '<div class="aviso ok" style="margin-top:6px;white-space:pre-wrap"><b>Resposta:</b> ' + esc(x.resposta) + "</div>" : "") + "</div>";
         }).join("") : "Você ainda não enviou nenhuma mensagem.";
+        // abriu e viu: as respostas deixam de ser novas (a bolinha da aba some; o vermelho fica até sair da aba)
+        ls.forEach(function (x) { if (x.resposta) v[marcaResp(x)] = 1; });
+        try { localStorage.setItem(chaveResp(), JSON.stringify(v)); } catch (e) { /* sem armazenamento */ }
+        if (RESP_NOVAS) { RESP_NOVAS = 0; var ab = $('#abas a[href="#sugestoes"] .bolinha'); if (ab) ab.remove(); }
       }).catch(function () { $("#sg-lista").textContent = "As sugestões ainda não estão ativas. Use o WhatsApp acima."; });
     }
     $("#sg-enviar").onclick = function () {
