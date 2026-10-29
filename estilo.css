@@ -136,3 +136,4 @@ tr.clic { cursor: pointer; } tr.clic:hover { background: var(--sup2); }
 .convite b { color: #fff; }
 .convite .botao { background: rgba(255, 255, 255, .08); color: #f5f1e6; border-color: rgba(245, 241, 230, .35); }
 .convite .botao.dest { background: linear-gradient(135deg, #e6c65c, #c9a227); color: #14132e; border-color: #c9a227; }
+.convite .convite-slogan { font-family: Georgia, "Times New Roman", serif; font-style: italic; color: #e6c65c; font-size: 17px; margin: -4px 0 10px; opacity: 1; }
