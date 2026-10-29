@@ -40,6 +40,7 @@
   <div class="item"><div class="ic">📤</div><h3>4. Poste</h3><p class="mudo">Um toque para mandar para o Instagram, Facebook, WhatsApp, Telegram ou TikTok.</p></div>
   <div class="item"><div class="ic">🤝</div><h3>5. Comunidade</h3><p class="mudo">Se quiser, sua empresa aparece no <a href="guia.html">Guia</a> da sua cidade e entra na rede de parceiros que se recomendam.</p></div>
 </div></section>
+<section class="sec" id="outros-sec"><h2>Outros projetos</h2><div class="itens" id="outros"></div></section>
 <section class="sec"><h2>Planos</h2><div class="planos" id="planos"><div class="item">Mensal · cobrança no cartão ou Pix</div></div>
   <p class="mudo peq" style="text-align:center;margin-top:12px">Cartão: renova sozinho. Pix: você recebe o código 5 dias antes do vencimento.</p></section>
 <footer class="rodape" id="rodape">Anuncia Aí</footer>
@@ -57,6 +58,12 @@
   ];
   var box = document.getElementById("exemplos");
   ex.forEach(function (d) { var cv = document.createElement("canvas"); R.desenhar(cv, Object.assign({ formato: "post", fotos: [] }, d)); box.appendChild(cv); });
+  var outros = A.CFG.OUTROS_PROJETOS || [];
+  if (!outros.length) document.getElementById("outros-sec").remove();
+  else document.getElementById("outros").innerHTML = outros.map(function (p) {
+    return '<div class="item"><div class="ic">' + A.esc(p.ic || "✨") + "</div><h3>" + A.esc(p.nome) + (p.em_breve ? ' <span class="selo atencao">em breve</span>' : "") + '</h3><p class="mudo">' + A.esc(p.desc || "") + "</p>" +
+      (p.link ? '<p><a target="_blank" rel="noopener" href="' + A.esc(p.link) + '">' + A.esc(p.link_nome || "Conhecer") + " →</a></p>" : p.em_breve ? '<p class="peq mudo">Quem usa o Anuncia Aí pode pedir para ser avisado na aba ✨ Mais apps.</p>' : "") + "</div>";
+  }).join("");
   if (A.CFG.SUPORTE_WHATSAPP) document.getElementById("rodape").innerHTML = 'Anuncia Aí · Dúvidas: <a target="_blank" rel="noopener" href="' + A.esc(A.linkZap(A.CFG.SUPORTE_WHATSAPP, "Olá! Quero saber mais do Anuncia Aí.")) + '">WhatsApp ' + A.esc(A.CFG.SUPORTE_WHATSAPP) + "</a>";
   if (A.configurado()) {
     fetch(A.CFG.SUPABASE_URL + "/rest/v1/planos?select=*&ativo=eq.true&order=ordem", { headers: { apikey: A.CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + A.CFG.SUPABASE_ANON_KEY } })

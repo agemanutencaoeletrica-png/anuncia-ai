@@ -37,8 +37,9 @@
       q(sb.from("avisos").select("*").order("enviado_em", { ascending: false }).limit(500)),
       q(sb.from("planos").select("*").order("ordem")),
       // sem o supabase/sugestoes.sql rodado, a aba avisa em vez de quebrar o painel
-      q(sb.from("sugestoes").select("*").order("criado_em", { ascending: false }).limit(500)).catch(function () { return null; })
-    ]).then(function (r) { S.emp = r[0]; S.pag = r[1]; S.av = r[2]; S.planos = r[3]; S.sug = r[4]; });
+      q(sb.from("sugestoes").select("*").order("criado_em", { ascending: false }).limit(500)).catch(function () { return null; }),
+      q(sb.from("interesses").select("*").order("criado_em", { ascending: false }).limit(2000)).catch(function () { return null; })
+    ]).then(function (r) { S.emp = r[0]; S.pag = r[1]; S.av = r[2]; S.planos = r[3]; S.sug = r[4]; S.int = r[5]; });
   }
   function montar() {
     app.innerHTML = '<div class="topo"><div class="marca">Anuncia <span>Aí</span></div><div class="peq">Painel do dono</div><div class="dir"><button class="peq" id="b-rec">↻</button><button class="peq" id="b-sair">Sair</button></div></div>' +
@@ -47,12 +48,12 @@
     $("#b-rec").onclick = function () { carregar().then(function () { rota(); A.avisar("Atualizado"); }); };
     window.addEventListener("hashchange", rota); rota();
   }
-  var ABAS = [["empresas", "Empresas"], ["pagamentos", "Pagamentos"], ["avisos", "Avisos enviados"], ["sugestoes", "Sugestões"], ["planos", "Planos"]];
+  var ABAS = [["empresas", "Empresas"], ["pagamentos", "Pagamentos"], ["avisos", "Avisos enviados"], ["sugestoes", "Sugestões"], ["interessados", "✨ Interessados"], ["planos", "Planos"]];
   function rota() {
     var aba = location.hash.slice(1) || "empresas"; if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "empresas";
     var novas = (S.sug || []).filter(function (x) { return !x.lida; }).length;
     $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" && novas ? " (" + novas + ")" : "") + "</a>"; }).join("");
-    ({ empresas: verEmpresas, pagamentos: verPagamentos, avisos: verAvisos, sugestoes: verSugestoes, planos: verPlanos })[aba]($("#conteudo"));
+    ({ empresas: verEmpresas, pagamentos: verPagamentos, avisos: verAvisos, sugestoes: verSugestoes, interessados: verInteressados, planos: verPlanos })[aba]($("#conteudo"));
   }
   function nomePlano(id) { var p = S.planos.filter(function (x) { return x.id === id; })[0]; return p ? p.nome : id || "—"; }
   function selo(e) {
@@ -156,6 +157,22 @@
         return "<tr><td>" + A.dataHora(a.enviado_em) + "</td><td>" + esc(nome(a.empresa_id)) + "</td><td>" + esc(rot[a.tipo] || a.tipo) + "</td><td>" + esc(a.canal) + "</td><td>" +
           (a.ok ? '<span class="selo bom">enviado</span>' : '<span class="selo critico">' + esc(a.erro || "falhou") + "</span>") + "</td></tr>";
       }).join("") : '<tr><td colspan="5" class="vazio">Nenhum aviso ainda.</td></tr>') + "</tbody></table></div></div>";
+  }
+  // ✨ quem pediu para ser avisado de um app novo (lista de espera)
+  function verInteressados(c) {
+    if (!S.int) { c.innerHTML = '<div class="cartao"><h2>✨ Interessados</h2><div class="aviso">Rode uma vez o <b>supabase/comunidade.sql</b> no SQL Editor do Supabase.</div></div>'; return; }
+    var nomes = {}; (A.CFG.OUTROS_PROJETOS || []).forEach(function (p) { nomes[p.id] = p.nome; });
+    var emp = function (id) { return S.emp.filter(function (x) { return x.id === id; })[0] || {}; }, por = {};
+    S.int.forEach(function (i) { (por[i.projeto] = por[i.projeto] || []).push(i); });
+    c.innerHTML = '<div class="cartao"><h2>✨ Interessados nos outros projetos</h2><p class="mudo peq">Empresas que tocaram em “Quero ser avisado” na aba Mais apps. Boas candidatas para testar primeiro.</p>' +
+      (Object.keys(por).length ? Object.keys(por).map(function (k) {
+        return '<h3 style="margin-top:12px">' + esc(nomes[k] || k) + " (" + por[k].length + ')</h3><div class="tabela"><table><thead><tr><th>Quando</th><th>Empresa</th><th>Ramo / cidade</th><th>Contato</th></tr></thead><tbody>' +
+          por[k].map(function (i) {
+            var e = emp(i.empresa_id);
+            return "<tr><td>" + A.data(i.criado_em) + "</td><td>" + esc(e.nome || "—") + "</td><td>" + esc([e.ramo, e.cidade].filter(Boolean).join(" · ")) + "</td><td>" +
+              (e.whatsapp ? '<a target="_blank" rel="noopener" href="' + esc(A.linkZap(e.whatsapp, "Olá, " + (e.nome || "") + "! Aqui é do Anuncia Aí. Você pediu para ser avisado sobre " + (nomes[k] || k) + ".")) + '">💬 ' + esc(e.whatsapp) + "</a>" : esc(e.email || "")) + "</td></tr>";
+          }).join("") + "</tbody></table></div>";
+      }).join("") : '<div class="vazio">Ninguém ainda.</div>') + "</div>";
   }
   function verSugestoes(c) {
     if (!S.sug) { c.innerHTML = '<div class="cartao"><h2>Sugestões</h2><div class="aviso">Para receber sugestões dos clientes, rode uma vez o <b>supabase/sugestoes.sql</b> no SQL Editor do Supabase.</div></div>'; return; }

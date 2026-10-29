@@ -596,3 +596,29 @@ drop policy if exists anuncia_vit_apaga on storage.objects;
 create policy anuncia_vit_apaga on storage.objects for delete to authenticated
   using (bucket_id = 'vitrine' and ((storage.foldername(name))[1] in (select id::text from public.empresas where dono = auth.uid()) or public.eh_admin()));
 
+-- ---------- ✨ Outros projetos: a empresa pede para ser avisada quando um app novo lançar ----------
+create table if not exists public.interesses (
+  empresa_id  uuid not null references public.empresas (id) on delete cascade,
+  projeto     text not null check (projeto ~ '^[a-z0-9-]{2,40}$'),
+  criado_em   timestamptz not null default now(),
+  primary key (empresa_id, projeto)
+);
+create or replace function public.quero_ser_avisado(p_projeto text, p_sim boolean default true) returns void
+language plpgsql volatile security definer set search_path = public as $$
+declare v_emp uuid;
+begin
+  select id into v_emp from public.empresas where dono = auth.uid();
+  if v_emp is null then raise exception 'Empresa não encontrada.'; end if;
+  if coalesce(p_projeto, '') !~ '^[a-z0-9-]{2,40}$' then raise exception 'Projeto inválido.'; end if;
+  if p_sim then insert into public.interesses (empresa_id, projeto) values (v_emp, p_projeto) on conflict do nothing;
+  else delete from public.interesses where empresa_id = v_emp and projeto = p_projeto; end if;
+end $$;
+alter table public.interesses enable row level security;
+drop policy if exists int_le on public.interesses;
+create policy int_le on public.interesses for select to authenticated
+  using (public.eh_admin() or empresa_id in (select id from public.empresas where dono = auth.uid()));
+drop policy if exists int_admin on public.interesses;
+create policy int_admin on public.interesses for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+revoke execute on function public.quero_ser_avisado(text, boolean) from public, anon;
+grant execute on function public.quero_ser_avisado(text, boolean) to authenticated;
+

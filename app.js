@@ -3,7 +3,7 @@
   "use strict";
   var A = window.AN, R = window.AN_ARTES, esc = A.esc, $ = A.$, $$ = A.$$;
   var app = $("#app"), sb = null, E = null, PLANOS = [], logoImg = null, logoDe = null;
-  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["comunidade", "🤝 Comunidade"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"]];
+  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["comunidade", "🤝 Comunidade"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"], ["mais", "✨ Mais apps"]];
   var arte = { modelo: "promocao", formato: "post", campos: {}, fotos: [], fotosURL: [], legenda: "", legendaEditada: false, por: {}, emp: null };
   var vigiaPix = null;
 
@@ -144,12 +144,12 @@
   function rota() {
     var aba = location.hash.slice(1) || "criar";
     if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "criar";
-    if (A.situacao(E).bloqueada && aba !== "assinatura" && aba !== "sugestoes") aba = "assinatura";
+    if (A.situacao(E).bloqueada && aba !== "assinatura" && aba !== "sugestoes" && aba !== "mais") aba = "assinatura";
     if (vigiaPix && aba !== "assinatura") { clearInterval(vigiaPix); vigiaPix = null; }
     $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + "</a>"; }).join("");
     faixa();
     var c = $("#conteudo");
-    ({ criar: verCriar, marca: verMarca, comunidade: verComunidade, assinatura: verAssinatura, sugestoes: verSugestoes })[aba](c);
+    ({ criar: verCriar, marca: verMarca, comunidade: verComunidade, assinatura: verAssinatura, sugestoes: verSugestoes, mais: verMais })[aba](c);
   }
 
   // ---------- criar arte ----------
@@ -228,7 +228,12 @@
     // ao trocar de modelo, os campos novos começam com o exemplo; os já preenchidos continuam
     M.campos.forEach(function (f) { if (!(f[0] in arte.campos)) arte.campos[f[0]] = f[2]; });
     if (arte.modelo === "frase") fraseAutomatica();
-    c.innerHTML = '<div class="cartao"><h3 style="margin-bottom:10px">1. Escolha o modelo</h3><div class="modelos">' +
+    // boas-vindas: mostra uma vez que existem outros projetos (aba ✨ Mais apps)
+    var chaveMais = "anuncia_mais_visto_" + E.id, verAviso = false;
+    try { verAviso = (A.CFG.OUTROS_PROJETOS || []).length > 0 && !localStorage.getItem(chaveMais); } catch (e) { verAviso = false; }
+    c.innerHTML = (verAviso ? '<div class="aviso linha" id="ar-mais" style="justify-content:space-between"><span>✨ Conheça também os outros projetos da AGE.</span>' +
+      '<span><a class="botao peq prim" href="#mais" id="ar-mais-ver">Ver</a> <button class="peq" id="ar-mais-x" aria-label="Fechar">✕</button></span></div>' : "") +
+      '<div class="cartao"><h3 style="margin-bottom:10px">1. Escolha o modelo</h3><div class="modelos">' +
       Object.keys(R.MODELOS).map(function (k) { var m = R.MODELOS[k]; return '<button data-modelo="' + k + '" class="' + (k === arte.modelo ? "ativo" : "") + '"><span class="ic">' + m.ic + "</span>" + esc(m.nome) + "</button>"; }).join("") +
       '</div></div><div class="editor"><div class="cartao"><h3>2. Preencha</h3><label for="ar-fmt">Formato</label><select id="ar-fmt">' +
       Object.keys(R.FORMATOS).map(function (k) { return '<option value="' + k + '"' + (k === arte.formato ? " selected" : "") + ">" + R.FORMATOS[k][2] + "</option>"; }).join("") + "</select>" +
@@ -254,6 +259,11 @@
     $$("[data-modelo]", c).forEach(function (b) {
       b.onclick = function () { guardarAtual(); abrirModelo(b.dataset.modelo); salvarRasc(); verCriar(c); };
     });
+    if ($("#ar-mais", c)) {
+      var visto = function () { try { localStorage.setItem(chaveMais, "1"); } catch (e) { /* sem armazenamento */ } };
+      $("#ar-mais-ver", c).onclick = visto;
+      $("#ar-mais-x", c).onclick = function () { visto(); $("#ar-mais", c).remove(); };
+    }
     $$("[data-campo]", c).forEach(function (i) {
       i.value = arte.campos[i.dataset.campo] || "";
       i.oninput = function () { arte.campos[i.dataset.campo] = i.value; redesenhar(); };
@@ -382,7 +392,7 @@
   function slugDe(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, ""); }
   function erroComunidade(e) {
     var m = A.msgErro(e);
-    return /salvar_vitrine|minha_rede|por_na_vitrine|recomendar|vitrine_artes|Bucket not found|schema cache|does not exist/i.test(m) ? "A Comunidade ainda não foi ativada no servidor (falta rodar o supabase/comunidade.sql)." : m;
+    return /salvar_vitrine|minha_rede|por_na_vitrine|recomendar|vitrine_artes|quero_ser_avisado|interesses|Bucket not found|schema cache|does not exist/i.test(m) ? "A Comunidade ainda não foi ativada no servidor (falta rodar o supabase/comunidade.sql)." : m;
   }
   function verComunidade(c) {
     var link = E.slug ? P.urlVitrine(E.slug) : "";
@@ -580,6 +590,38 @@
         q(sb.rpc("remover_telegram")).then(function () { TG = { configurado: false }; verTelegram(el); }).catch(function (e) { msg(esc(A.msgErro(e)), "erro"); });
       };
     });
+  }
+
+  // ---------- ✨ outros projetos ----------
+  function verMais(c) {
+    var ps = A.CFG.OUTROS_PROJETOS || [];
+    try { localStorage.setItem("anuncia_mais_visto_" + E.id, "1"); } catch (e) { /* sem armazenamento */ }
+    c.innerHTML = '<div class="cartao"><h2>✨ Mais apps</h2><p class="mudo peq">Outros projetos de quem faz o Anuncia Aí. Não precisa de outro cadastro para conhecer.</p></div>' +
+      (ps.length ? ps.map(function (p) {
+        return '<div class="cartao"><div class="linha"><span style="font-size:32px">' + esc(p.ic || "✨") + '</span><h2 style="flex:1">' + esc(p.nome) + "</h2>" +
+          (p.em_breve ? '<span class="selo atencao">em breve</span>' : "") + "</div>" + (p.desc ? '<p style="margin:8px 0">' + esc(p.desc) + "</p>" : "") +
+          ((p.itens || []).length ? '<ul class="peq" style="margin:0 0 8px;padding-left:20px">' + p.itens.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") + "</ul>" : "") +
+          '<div class="acoes">' + (p.em_breve ? '<button class="prim" data-aviso="' + esc(p.id) + '">🔔 Quero ser avisado</button>' : "") +
+          (p.link ? '<a class="botao' + (p.em_breve ? "" : " prim") + '" target="_blank" rel="noopener" href="' + esc(p.link) + '">' + esc(p.link_nome || "Conhecer") + "</a>" : "") +
+          (p.link2 ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(p.link2) + '">' + esc(p.link2_nome || "Ver mais") + "</a>" : "") +
+          (p.whatsapp ? '<a class="botao zap" target="_blank" rel="noopener" href="' + esc(A.linkZap(p.whatsapp, "Olá! Sou da " + E.nome + " (uso o Anuncia Aí) e quero saber mais sobre " + p.nome + ".")) + '">💬 WhatsApp</a>' : "") +
+          "</div></div>";
+      }).join("") : '<div class="cartao vazio">Em breve.</div>');
+    var marcados = {};
+    function botoes() {
+      $$("[data-aviso]", c).forEach(function (b) {
+        var sim = !!marcados[b.dataset.aviso];
+        b.textContent = sim ? "✅ Você será avisado (tocar para cancelar)" : "🔔 Quero ser avisado"; b.classList.toggle("prim", !sim);
+        b.onclick = function () {
+          A.ocupado(b, true, "...");
+          q(sb.rpc("quero_ser_avisado", { p_projeto: b.dataset.aviso, p_sim: !sim })).then(function () {
+            A.ocupado(b, false); if (sim) delete marcados[b.dataset.aviso]; else marcados[b.dataset.aviso] = 1;
+            if (!sim) A.avisar("🔔 Combinado! Avisamos você quando lançar.", "ok"); botoes();
+          }).catch(function (e) { A.ocupado(b, false); A.avisar(erroComunidade(e).replace("Comunidade", "lista de espera"), "erro"); });
+        };
+      });
+    }
+    q(sb.from("interesses").select("projeto").eq("empresa_id", E.id)).then(function (ls) { ls.forEach(function (x) { marcados[x.projeto] = 1; }); botoes(); }).catch(function () { botoes(); });
   }
 
   // ---------- sugestões ----------

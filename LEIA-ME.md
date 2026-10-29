@@ -67,6 +67,8 @@ Crie 4 funções (**Deploy a new function → Via Editor**), colando o arquivo `
 **Publicar no Telegram:** em instalação que já existia, rode uma vez o `supabase/telegram.sql` e crie a função `telegram`.
 
 **🤝 Comunidade (vitrine, guia e rede):** em instalação que já existia, rode uma vez o `supabase/comunidade.sql`. Cada empresa escolhe em “🤝 Comunidade” se aparece no Guia (`guia.html`); a página pública dela é `vitrine.html?e=endereco`. O público só vê nome, ramo, cidade, bairro, descrição, contatos, logo, as artes que a empresa pôs na vitrine e o ponto no mapa (exato só se ela escolher; senão, arredondado a uns 1 km) — nunca e-mail ou dados da assinatura — e só enquanto a assinatura estiver em dia.
+
+**✨ Mais apps (outros projetos):** a lista fica em `config.js` → `OUTROS_PROJETOS` (nome, texto, link, WhatsApp). Com `em_breve: true` aparece o botão “Quero ser avisado”; quem tocar aparece no painel do dono, aba “✨ Interessados” (precisa do `supabase/comunidade.sql`).
 Cada empresa liga o próprio robô (do @BotFather) e o canal em **Minha marca**; o código do robô fica numa tabela que o app não lê.
 
 ### 4. E-mail dos avisos (Brevo, grátis)
