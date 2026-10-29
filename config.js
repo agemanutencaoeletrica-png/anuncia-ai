@@ -13,7 +13,8 @@ window.ANUNCIA_CONFIG = {
   SUPORTE_EMAIL: "",
 
   // 🤝 Nome da rede de empresas (vitrine, guia, convite). Para trocar, é só mudar aqui.
-  NOME_REDE: "AGE Divulga",
+  NOME_REDE: "AGE Conecta",
+  SLOGAN_REDE: "Empresas que se indicam e crescem juntas",
 
   // ✨ Outros projetos (aba "Mais apps" do app e o site). Para trocar o nome, o texto ou incluir outro app, edite aqui.
   // em_breve: true mostra "Quero ser avisado" (a lista de interessados aparece no painel do dono).

@@ -3,7 +3,7 @@
 // (vitrine_publica, guia, guia_filtros): nada de e-mail, pagamento ou situação da assinatura.
 (function () {
   "use strict";
-  var A = window.AN, esc = A.esc, $ = A.$, CFG = A.CFG, REDE = CFG.NOME_REDE || "Comunidade Anuncia Aí";
+  var A = window.AN, esc = A.esc, $ = A.$, CFG = A.CFG, REDE = CFG.NOME_REDE || "Comunidade Anuncia Aí", SLOGAN = CFG.SLOGAN_REDE || "";
 
   function rpc(nome, args) {
     return fetch(CFG.SUPABASE_URL + "/rest/v1/rpc/" + nome, {
@@ -120,6 +120,7 @@
   // 🏛️ convite para a comunidade (vitrine, guia e site)
   function htmlConvite() {
     return '<section class="convite"><div class="convite-sel">' + esc(REDE) + '</div><h2>Venha fazer parte da nossa rede</h2>' +
+      (SLOGAN ? '<p class="convite-slogan">' + esc(SLOGAN) + "</p>" : "") +
       "<p>Reunimos empresas que acreditam no trabalho bem feito e na força da boa indicação. Aqui, cada negócio tem a sua vitrine, é encontrado por quem está perto " +
       "e caminha ao lado de parceiros que se recomendam.</p><ul>" +
       "<li><b>Uma vitrine elegante</b>, com seus links, mapa, avaliações e novidades</li>" +
@@ -217,7 +218,7 @@
   function verGuia(alvo) {
     document.title = "Guia " + REDE + " — empresas da sua cidade";
     var qs = new URLSearchParams(location.search), F = { cidade: qs.get("cidade") || "", ramo: qs.get("ramo") || "", busca: qs.get("q") || "" };
-    alvo.innerHTML = '<header class="vit-topo"><h1>🗺️ Guia ' + esc(REDE) + '</h1><p>Empresas e profissionais da sua região. Chame direto no WhatsApp.</p></header><main>' +
+    alvo.innerHTML = '<header class="vit-topo"><h1>🗺️ Guia ' + esc(REDE) + "</h1><p>" + esc(SLOGAN ? SLOGAN + "." : "Empresas e profissionais da sua região.") + " Encontre quem está perto e chame direto no WhatsApp.</p></header><main>" +
       '<div class="cartao"><div class="filtros-guia"><select id="gu-cid" aria-label="Cidade"><option value="">Todas as cidades</option></select>' +
       '<select id="gu-ramo" aria-label="Ramo"><option value="">Todos os ramos</option></select>' +
       '<input id="gu-busca" type="search" placeholder="🔎 O que você procura? (ex.: eletricista, bolo, pintura)"></div>' +
