@@ -3,7 +3,11 @@
   "use strict";
   var A = window.AN, R = window.AN_ARTES, esc = A.esc, $ = A.$, $$ = A.$$;
   var app = $("#app"), sb = null, E = null, PLANOS = [], logoImg = null, logoDe = null;
-  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["comunidade", "🤝 Comunidade"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"], ["mais", "✨ Mais apps"]];
+  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["comunidade", "🤝 Comunidade"], ["indique", "🎁 Indique e ganhe"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"], ["mais", "✨ Mais apps"]];
+  // código de indicação que veio no link (?ind=XXXXXX): fica guardado até a empresa ser criada
+  var IND_CHAVE = "anuncia_indicacao";
+  (function () { var c = (new URLSearchParams(location.search).get("ind") || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 12); if (c) try { localStorage.setItem(IND_CHAVE, c); } catch (e) { /* sem armazenamento */ } })();
+  function indGuardado() { try { return localStorage.getItem(IND_CHAVE) || ""; } catch (e) { return ""; } }
   var arte = { modelo: "promocao", formato: "post", campos: {}, fotos: [], fotosURL: [], legenda: "", legendaEditada: false, por: {}, emp: null };
   var vigiaPix = null;
 
@@ -112,6 +116,7 @@
       '<label for="pe-ramo">Ramo</label>' + campoRamo("pe-ramo", "") +
       '<div class="duas"><div><label for="pe-cid">Cidade</label><input id="pe-cid" maxlength="80"></div><div><label for="pe-zap">WhatsApp</label><input id="pe-zap" type="tel" maxlength="30" placeholder="(31) 99999-9999"></div></div>' +
       '<label for="pe-ig">Instagram</label><input id="pe-ig" maxlength="60" placeholder="@suaempresa">' +
+      '<label for="pe-ind">Código de indicação (se alguém indicou)</label><input id="pe-ind" maxlength="12" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px" value="' + esc(indGuardado()) + '" placeholder="Opcional">' +
       '<div id="pe-msg"></div><div class="acoes"><button class="prim" type="submit">Começar</button></div></form>' +
       '<p style="text-align:center"><button class="texto peq" id="pe-sair">Sair</button></p></div>';
     $("#pe-sair").onclick = function () { sb.auth.signOut(); };
@@ -120,7 +125,13 @@
       var b = $("button[type=submit]", this);
       A.ocupado(b, true, "Criando...");
       q(sb.rpc("criar_empresa", { p_nome: $("#pe-nome").value.trim(), p_ramo: $("#pe-ramo").value.trim() || null, p_cidade: $("#pe-cid").value.trim() || null,
-        p_whatsapp: $("#pe-zap").value.trim() || null, p_instagram: $("#pe-ig").value.trim() || null })).then(function () { location.hash = "#marca"; return carregar(); })
+        p_whatsapp: $("#pe-zap").value.trim() || null, p_instagram: $("#pe-ig").value.trim() || null })).then(function () {
+          // indicação: liga a empresa nova a quem indicou (se o código não valer, avisa e segue)
+          var cod = $("#pe-ind").value.trim().toUpperCase();
+          if (!cod) return;
+          return q(sb.rpc("usar_indicacao", { p_codigo: cod })).then(function (quem) { A.avisar("🎁 Indicação registrada: " + quem + " indicou você.", "ok"); try { localStorage.removeItem(IND_CHAVE); } catch (e) { /* sem armazenamento */ } })
+            .catch(function (e) { A.avisar("Empresa criada, mas o código de indicação não valeu: " + A.msgErro(e), "erro"); });
+        }).then(function () { location.hash = "#marca"; return carregar(); })
         .catch(function (e) { A.ocupado(b, false); $("#pe-msg").innerHTML = '<div class="aviso erro">' + esc(A.msgErro(e)) + "</div>"; });
     };
   }
@@ -149,7 +160,48 @@
     $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" && RESP_NOVAS ? '<span class="bolinha">' + RESP_NOVAS + "</span>" : "") + "</a>"; }).join("");
     faixa();
     var c = $("#conteudo");
-    ({ criar: verCriar, marca: verMarca, comunidade: verComunidade, assinatura: verAssinatura, sugestoes: verSugestoes, mais: verMais })[aba](c);
+    ({ criar: verCriar, marca: verMarca, comunidade: verComunidade, indique: verIndique, assinatura: verAssinatura, sugestoes: verSugestoes, mais: verMais })[aba](c);
+  }
+
+  // ---------- 🎁 indique e ganhe ----------
+  var ST_IND = { aguardando: ["⏳ aguardando o 1º pagamento", ""], liberada: ["💰 a receber", "atencao"], paga: ["✅ paga", "bom"], cancelada: ["cancelada", "critico"] };
+  function verIndique(c) {
+    c.innerHTML = '<div class="cartao"><div class="vazio">Carregando...</div></div>';
+    Promise.all([q(sb.rpc("meu_codigo_indicacao")), q(sb.rpc("minhas_indicacoes"))]).then(function (r) {
+      var cod = r[0], d = r[1], lista = d.lista || [], valor = Number(d.valor) || 0;
+      var link = location.href.split("#")[0].split("?")[0].replace(/[^/]*$/, "") + "index.html?ind=" + cod;
+      var aReceber = lista.filter(function (x) { return x.status === "liberada"; }), pagas = lista.filter(function (x) { return x.status === "paga"; });
+      var soma = function (l) { return l.reduce(function (t, x) { return t + (Number(x.valor) || 0); }, 0); };
+      var msg = "Uso o Anuncia Aí para criar as artes da minha empresa e recomendo! 🎨\nCadastre-se pelo meu link e ganhe 7 dias grátis para testar:\n" + link + "\n(ou use o código " + cod + ")";
+      c.innerHTML = '<div class="cartao"><h2>🎁 Indique e ganhe</h2>' +
+        (d.ativo === false ? '<div class="aviso">O programa de indicação está pausado no momento.</div>' :
+          '<p>Indique o Anuncia Aí para outras empresas. Quando a empresa indicada fizer o <b>primeiro pagamento</b>, você ganha <b>' + A.dinheiro(valor) + "</b> por indicação, no Pix que você cadastrar abaixo.</p>") +
+        (d.regras ? '<p class="peq mudo">' + esc(d.regras) + "</p>" : "") +
+        '<div class="linha" style="margin:10px 0"><div><div class="peq mudo">Seu código</div><div style="font:800 30px/1.1 ui-monospace,monospace;letter-spacing:4px">' + esc(cod) + "</div></div></div>" +
+        '<div class="peq mudo" style="word-break:break-all">' + esc(link) + "</div>" +
+        '<div class="acoes"><a class="botao zap" target="_blank" rel="noopener" href="' + esc(A.linkZap("", msg)) + '">💬 Enviar no WhatsApp</a><button id="ind-copiar">📋 Copiar o link</button></div></div>' +
+        '<div class="cartao"><h3>Chave Pix para receber</h3><div class="linha" style="flex-wrap:nowrap"><input id="ind-pix" maxlength="120" placeholder="CPF, CNPJ, celular, e-mail ou chave aleatória" value="' + esc(d.pix || "") + '"><button class="prim" id="ind-pix-s">Salvar</button></div></div>' +
+        '<div class="cartao"><div class="linha"><h3>Suas indicações (' + lista.length + ')</h3><span class="dir peq">A receber: <b>' + A.dinheiro(soma(aReceber)) + "</b> · Recebido: <b>" + A.dinheiro(soma(pagas)) + "</b></span></div>" +
+        (lista.length ? '<div class="tabela"><table><thead><tr><th>Empresa indicada</th><th>Desde</th><th>Situação</th><th class="num">Valor</th></tr></thead><tbody>' + lista.map(function (x) {
+          var st = ST_IND[x.status] || [x.status, ""];
+          return "<tr><td>" + esc(x.nome) + "</td><td>" + A.data(x.criado_em) + '</td><td><span class="selo ' + st[1] + '">' + st[0] + (x.paga_em ? " " + A.data(x.paga_em) : "") + '</span></td><td class="num">' + (x.valor ? A.dinheiro(x.valor) : "—") + "</td></tr>";
+        }).join("") + "</tbody></table></div>" : '<div class="vazio">Ninguém ainda. Mande o seu link para os seus contatos!</div>') + "</div>" +
+        (d.fui_indicado ? "" : '<details class="cartao"><summary><b>Alguém indicou você?</b></summary><p class="peq mudo">Vale até 30 dias depois do cadastro e antes do primeiro pagamento.</p>' +
+          '<div class="linha" style="flex-wrap:nowrap"><input id="ind-usar" maxlength="12" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:2px" placeholder="Código" value="' + esc(indGuardado()) + '"><button id="ind-usar-b">Usar código</button></div></details>');
+      $("#ind-copiar").onclick = function () { A.copiar(link, "Link copiado"); };
+      $("#ind-pix-s").onclick = function () {
+        var b = this; A.ocupado(b, true, "...");
+        q(sb.rpc("salvar_pix_indicacao", { p_pix: $("#ind-pix").value })).then(function () { A.ocupado(b, false); A.avisar("Chave Pix salva.", "ok"); }).catch(function (e) { A.ocupado(b, false); A.avisar(A.msgErro(e), "erro"); });
+      };
+      var bu = $("#ind-usar-b");
+      if (bu) bu.onclick = function () {
+        var b = this; A.ocupado(b, true, "...");
+        q(sb.rpc("usar_indicacao", { p_codigo: $("#ind-usar").value })).then(function (quem) { A.avisar("🎁 Indicação registrada: " + quem + " indicou você.", "ok"); try { localStorage.removeItem(IND_CHAVE); } catch (e) { /* sem armazenamento */ } verIndique(c); })
+          .catch(function (e) { A.ocupado(b, false); A.avisar(A.msgErro(e), "erro"); });
+      };
+    }).catch(function (e) {
+      c.innerHTML = '<div class="cartao"><h2>🎁 Indique e ganhe</h2><div class="aviso">' + (/function|schema cache|does not exist/i.test(A.msgErro(e)) ? "Em breve. (Dono: rode o <b>supabase/indicacoes.sql</b> no Supabase.)" : esc(A.msgErro(e))) + "</div></div>";
+    });
   }
 
   // ---------- criar arte ----------
