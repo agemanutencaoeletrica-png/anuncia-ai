@@ -12,6 +12,9 @@ window.ANUNCIA_CONFIG = {
   SUPORTE_WHATSAPP: "(31) 98858-9772",
   SUPORTE_EMAIL: "",
 
+  // 🤝 Nome da rede de empresas (vitrine, guia, convite). Para trocar, é só mudar aqui.
+  NOME_REDE: "AGE Divulga",
+
   // ✨ Outros projetos (aba "Mais apps" do app e o site). Para trocar o nome, o texto ou incluir outro app, edite aqui.
   // em_breve: true mostra "Quero ser avisado" (a lista de interessados aparece no painel do dono).
   OUTROS_PROJETOS: [
