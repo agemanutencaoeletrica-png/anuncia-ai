@@ -3,7 +3,7 @@
   "use strict";
   var A = window.AN, R = window.AN_ARTES, esc = A.esc, $ = A.$, $$ = A.$$;
   var app = $("#app"), sb = null, E = null, PLANOS = [], logoImg = null, logoDe = null;
-  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"]];
+  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["comunidade", "🤝 Comunidade"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"], ["mais", "✨ Mais apps"]];
   var arte = { modelo: "promocao", formato: "post", campos: {}, fotos: [], fotosURL: [], legenda: "", legendaEditada: false, por: {}, emp: null };
   var vigiaPix = null;
 
@@ -144,12 +144,12 @@
   function rota() {
     var aba = location.hash.slice(1) || "criar";
     if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "criar";
-    if (A.situacao(E).bloqueada && aba !== "assinatura" && aba !== "sugestoes") aba = "assinatura";
+    if (A.situacao(E).bloqueada && aba !== "assinatura" && aba !== "sugestoes" && aba !== "mais") aba = "assinatura";
     if (vigiaPix && aba !== "assinatura") { clearInterval(vigiaPix); vigiaPix = null; }
     $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + "</a>"; }).join("");
     faixa();
     var c = $("#conteudo");
-    ({ criar: verCriar, marca: verMarca, assinatura: verAssinatura, sugestoes: verSugestoes })[aba](c);
+    ({ criar: verCriar, marca: verMarca, comunidade: verComunidade, assinatura: verAssinatura, sugestoes: verSugestoes, mais: verMais })[aba](c);
   }
 
   // ---------- criar arte ----------
@@ -228,7 +228,12 @@
     // ao trocar de modelo, os campos novos começam com o exemplo; os já preenchidos continuam
     M.campos.forEach(function (f) { if (!(f[0] in arte.campos)) arte.campos[f[0]] = f[2]; });
     if (arte.modelo === "frase") fraseAutomatica();
-    c.innerHTML = '<div class="cartao"><h3 style="margin-bottom:10px">1. Escolha o modelo</h3><div class="modelos">' +
+    // boas-vindas: mostra uma vez que existem outros projetos (aba ✨ Mais apps)
+    var chaveMais = "anuncia_mais_visto_" + E.id, verAviso = false;
+    try { verAviso = (A.CFG.OUTROS_PROJETOS || []).length > 0 && !localStorage.getItem(chaveMais); } catch (e) { verAviso = false; }
+    c.innerHTML = (verAviso ? '<div class="aviso linha" id="ar-mais" style="justify-content:space-between"><span>✨ Conheça também os outros projetos da AGE.</span>' +
+      '<span><a class="botao peq prim" href="#mais" id="ar-mais-ver">Ver</a> <button class="peq" id="ar-mais-x" aria-label="Fechar">✕</button></span></div>' : "") +
+      '<div class="cartao"><h3 style="margin-bottom:10px">1. Escolha o modelo</h3><div class="modelos">' +
       Object.keys(R.MODELOS).map(function (k) { var m = R.MODELOS[k]; return '<button data-modelo="' + k + '" class="' + (k === arte.modelo ? "ativo" : "") + '"><span class="ic">' + m.ic + "</span>" + esc(m.nome) + "</button>"; }).join("") +
       '</div></div><div class="editor"><div class="cartao"><h3>2. Preencha</h3><label for="ar-fmt">Formato</label><select id="ar-fmt">' +
       Object.keys(R.FORMATOS).map(function (k) { return '<option value="' + k + '"' + (k === arte.formato ? " selected" : "") + ">" + R.FORMATOS[k][2] + "</option>"; }).join("") + "</select>" +
@@ -249,11 +254,16 @@
       '<p class="mudo peq" style="margin-top:8px">💾 O que você escreve fica salvo neste aparelho, em cada modelo. <button class="texto peq" id="ar-limpar">🧹 Limpar este modelo</button></p></div>' +
       '<div><div class="previa cartao" style="padding:10px"><canvas id="cv-arte" aria-label="Prévia da arte"></canvas></div>' +
       '<div class="acoes" style="margin-top:0">' + (podeCompartilhar() ? '<button class="prim" id="ar-postar">📤 Postar (Instagram, Facebook, WhatsApp, Telegram...)</button>' : "") +
-      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><a id="ar-tg-ver" class="botao oculto" target="_blank" rel="noopener">👁 Ver publicação no Telegram</a><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
+      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><button id="ar-vit" title="Mostra esta arte na sua vitrine do Guia Anuncia Aí">📌 Pôr na minha vitrine</button><a id="ar-tg-ver" class="botao oculto" target="_blank" rel="noopener">👁 Ver publicação no Telegram</a><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
       '<p class="mudo peq">No Instagram a legenda não vai junto automaticamente: ela já fica copiada, é só colar no post.</p></div></div>';
     $$("[data-modelo]", c).forEach(function (b) {
       b.onclick = function () { guardarAtual(); abrirModelo(b.dataset.modelo); salvarRasc(); verCriar(c); };
     });
+    if ($("#ar-mais", c)) {
+      var visto = function () { try { localStorage.setItem(chaveMais, "1"); } catch (e) { /* sem armazenamento */ } };
+      $("#ar-mais-ver", c).onclick = visto;
+      $("#ar-mais-x", c).onclick = function () { visto(); $("#ar-mais", c).remove(); };
+    }
     $$("[data-campo]", c).forEach(function (i) {
       i.value = arte.campos[i.dataset.campo] || "";
       i.oninput = function () { arte.campos[i.dataset.campo] = i.value; redesenhar(); };
@@ -290,6 +300,20 @@
     function nome() { return "anuncia-ai-" + arte.modelo + "-" + Date.now() + ".jpg"; }
     $("#ar-baixar", c).onclick = function () { blob().then(function (b) { A.baixar(b, nome()); A.copiar($("#ar-leg").value, "Imagem baixada e legenda copiada."); }); };
     $("#ar-copiar", c).onclick = function () { A.copiar($("#ar-leg").value, "Legenda copiada."); };
+    $("#ar-vit", c).onclick = function () {
+      if (!E.vitrine) { if (window.confirm("A sua vitrine está desligada. Abrir 🤝 Comunidade para ligar?")) location.hash = "#comunidade"; return; }
+      var b = this; A.ocupado(b, true, "Enviando...");
+      blob().then(function (bl) {
+        var cam = E.id + "/arte-" + Date.now() + ".jpg";
+        return q(sb.storage.from("vitrine").upload(cam, bl, { contentType: "image/jpeg", upsert: false })).then(function () {
+          return q(sb.rpc("por_na_vitrine", { p_caminho: cam, p_legenda: $("#ar-leg").value }));
+        });
+      }).then(function (sairam) {
+        // a vitrine guarda as 12 mais novas: apaga os arquivos das que saíram
+        if (sairam && sairam.length) sb.storage.from("vitrine").remove(sairam).catch(function () {});
+        A.ocupado(b, false); A.avisar("📌 Arte na sua vitrine", "ok");
+      }).catch(function (e) { A.ocupado(b, false); A.avisar(erroComunidade(e), "erro"); });
+    };
     statusTelegram().then(function (st) {
       var b = $("#ar-tg", c); if (!b) return;
       if (st.configurado) { b.classList.remove("oculto"); b.textContent = "📢 Publicar no Telegram (" + st.canal + ")"; }
@@ -363,6 +387,163 @@
     };
   }
 
+  // ---------- 🤝 comunidade: vitrine pública (opcional), guia e rede de parceiros ----------
+  var P = window.AN_PUB;
+  function slugDe(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, ""); }
+  function erroComunidade(e) {
+    var m = A.msgErro(e);
+    return /salvar_vitrine|minha_rede|por_na_vitrine|recomendar|vitrine_artes|quero_ser_avisado|interesses|Bucket not found|schema cache|does not exist/i.test(m) ? "A Comunidade ainda não foi ativada no servidor (falta rodar o supabase/comunidade.sql)." : m;
+  }
+  function verComunidade(c) {
+    var link = E.slug ? P.urlVitrine(E.slug) : "";
+    c.innerHTML = '<div class="cartao"><h2>🗺️ Minha vitrine</h2><p class="mudo peq">Uma página da sua empresa no <a href="guia.html" target="_blank" rel="noopener">Guia Anuncia Aí</a>, com logo, contatos, descrição e as artes que você escolher. ' +
+      "Só aparece se você ligar. Nome, ramo, cidade, WhatsApp e Instagram vêm de 🏷️ Minha marca.</p>" +
+      '<label class="marca-linha"><input type="checkbox" id="cm-vit"> Mostrar a minha empresa no Guia (página pública)</label>' +
+      '<label for="cm-slug">Endereço da página</label><div class="linha"><span class="peq mudo">…/vitrine.html?e=</span><input id="cm-slug" maxlength="60" autocapitalize="none" spellcheck="false" style="flex:1;min-width:160px"></div>' +
+      '<div class="duas"><div><label for="cm-bairro">Bairro onde atende</label><input id="cm-bairro" maxlength="80"></div><div><label>Cidade</label><input disabled value="' + esc(E.cidade || "— preencha em Minha marca") + '"></div></div>' +
+      '<label for="cm-desc">Sobre a empresa</label><textarea id="cm-desc" rows="4" maxlength="500" placeholder="O que você faz, onde atende, horário, diferenciais"></textarea>' +
+      '<h3 style="margin-top:16px">📍 No mapa (opcional)</h3><p class="mudo peq" style="margin:2px 0 0">Para aparecer no mapa do Guia e no “📍 Perto de mim” de quem procura.</p>' +
+      '<label for="cm-end">Endereço</label><input id="cm-end" maxlength="200" placeholder="Rua e número (não aparece se você escolher “só a região”)">' +
+      '<div class="linha" style="margin-top:6px"><button class="peq" id="cm-gps">📍 Usar minha localização</button><button class="peq" id="cm-achar">🔎 Achar pelo endereço</button><button class="peq oculto" id="cm-sem">Tirar do mapa</button></div>' +
+      '<div id="cm-mapa" class="mapa oculto" style="margin-top:8px"></div><p class="peq mudo" id="cm-pos" style="margin:4px 0 0"></p>' +
+      '<label class="marca-linha" style="font-weight:400"><input type="radio" name="cm-exato" value="0"> Mostrar só a região, uns 1 km (atendo em casa ou no local do cliente)</label>' +
+      '<label class="marca-linha" style="font-weight:400"><input type="radio" name="cm-exato" value="1"> Mostrar o endereço exato (tenho loja ou escritório)</label>' +
+      '<label for="cm-raio">Atende até</label><select id="cm-raio"><option value="">— não informar —</option>' + [5, 10, 20, 30, 50, 100].map(function (k) { return '<option value="' + k + '">' + k + " km</option>"; }).join("") + "</select>" +
+      '<label for="cm-maps">Link do seu perfil no Google Maps (avaliações)</label><input id="cm-maps" maxlength="300" inputmode="url" placeholder="https://maps.app.goo.gl/...">' +
+      '<details class="peq" style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">Ainda não aparece no Google Maps? Veja como colocar (grátis)</summary><ol>' +
+      '<li>Abra <a href="https://business.google.com/create" target="_blank" rel="noopener">business.google.com/create</a> e entre com a conta Google da empresa.</li>' +
+      "<li>Escreva o nome da empresa e a categoria (ex.: Eletricista, Pintor).</li>" +
+      "<li>Se atende na casa do cliente, diga que <b>não</b> tem local para receber clientes e escolha as cidades e bairros que atende: o seu endereço não aparece.</li>" +
+      "<li>Coloque o WhatsApp e, no site, o link da sua vitrine do Anuncia Aí.</li>" +
+      "<li>Faça a verificação que o Google pedir (vídeo, ligação ou código).</li>" +
+      "<li>Pronto no Google: abra o seu perfil no Google Maps, toque em <b>Compartilhar</b>, copie o link e cole aqui em cima. Na sua vitrine aparece o botão ⭐ Avaliações no Google.</li></ol></details>" +
+      '<div id="cm-msg"></div><div class="acoes"><button class="prim" id="cm-salvar">Salvar</button>' +
+      (E.vitrine && link ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(link) + '">👁 Ver minha vitrine</a><button id="cm-copiar">📋 Copiar link</button>' : "") + "</div>" +
+      (E.vitrine ? '<h3 style="margin-top:16px">Artes na vitrine</h3><p class="mudo peq">Em 🎨 Criar arte, toque em <b>📌 Pôr na minha vitrine</b>. Ficam as 12 mais novas.</p><div id="cm-artes" class="artes-grade"><span class="mudo peq">Carregando...</span></div>' : "") + "</div>" +
+      '<div class="cartao" id="cm-rede"><h2>🤝 Minha rede</h2>' + (E.vitrine ? '<div class="mudo peq">Carregando...</div>' :
+        '<p class="mudo peq">Ligue a sua vitrine para entrar na rede: você recomenda até 6 parceiros que completam o seu serviço (ex.: o eletricista indica o pintor), eles aparecem na sua vitrine e você divulga as artes deles. Eles podem fazer o mesmo por você.</p>') + "</div>";
+    $("#cm-vit").checked = !!E.vitrine; $("#cm-slug").value = E.slug || slugDe(E.nome); $("#cm-bairro").value = E.bairro || ""; $("#cm-desc").value = E.descricao || "";
+    $("#cm-end").value = E.endereco || ""; $("#cm-raio").value = E.raio_km ? String(E.raio_km) : ""; $("#cm-maps").value = E.maps_url || "";
+    $$('input[name="cm-exato"]', c).forEach(function (r) { r.checked = r.value === (E.local_exato ? "1" : "0"); });
+    // 📍 ponto no mapa: GPS do aparelho ou endereço; dá para arrastar o marcador para acertar
+    var loc = E.lat !== null && E.lat !== undefined ? { lat: E.lat, lng: E.lng } : null, mapa = null, marca = null;
+    function mostrarLoc() {
+      $("#cm-sem").classList.toggle("oculto", !loc);
+      $("#cm-pos").textContent = loc ? "📍 Ponto marcado. Se não estiver certo, arraste o marcador no mapa." : "Sem ponto no mapa.";
+      if (!loc) { $("#cm-mapa").classList.add("oculto"); return; }
+      $("#cm-mapa").classList.remove("oculto");
+      (mapa ? Promise.resolve(mapa) : P.novoMapa($("#cm-mapa"), loc.lat, loc.lng, 16).then(function (x) { mapa = x; return x; })).then(function (x) {
+        if (!marca) { marca = x.L.marker([loc.lat, loc.lng], { draggable: true }).addTo(x.m); marca.on("dragend", function () { var p = marca.getLatLng(); loc = { lat: p.lat, lng: p.lng }; }); }
+        else marca.setLatLng([loc.lat, loc.lng]);
+        x.m.setView([loc.lat, loc.lng], 16); setTimeout(function () { x.m.invalidateSize(); }, 50);
+      }).catch(function () { $("#cm-pos").textContent = "📍 Ponto marcado (o mapa não carregou agora)."; });
+    }
+    mostrarLoc();
+    $("#cm-gps").onclick = function () {
+      var b = this; if (!navigator.geolocation) { A.avisar("Este aparelho não informa a localização.", "erro"); return; }
+      A.ocupado(b, true, "Localizando...");
+      navigator.geolocation.getCurrentPosition(function (p) { A.ocupado(b, false); loc = { lat: p.coords.latitude, lng: p.coords.longitude }; mostrarLoc(); },
+        function () { A.ocupado(b, false); A.avisar("Não consegui a localização. Libere a localização para este site, ou use 🔎 Achar pelo endereço.", "erro"); }, { enableHighAccuracy: true, timeout: 20000 });
+    };
+    $("#cm-achar").onclick = function () {
+      var b = this, qy = [$("#cm-end").value.trim(), $("#cm-bairro").value.trim(), E.cidade].filter(Boolean).join(", ");
+      if (!qy) { A.avisar("Escreva o endereço ou o bairro.", "erro"); return; }
+      A.ocupado(b, true, "Procurando...");
+      fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&accept-language=pt-BR&q=" + encodeURIComponent(qy)).then(function (r) { return r.json(); }).then(function (ls) {
+        A.ocupado(b, false);
+        if (!ls || !ls.length) { A.avisar("Não achei esse endereço. Tente só a rua e o bairro, ou use 📍 Usar minha localização.", "erro"); return; }
+        loc = { lat: Number(ls[0].lat), lng: Number(ls[0].lon) }; mostrarLoc();
+      }).catch(function () { A.ocupado(b, false); A.avisar("Sem internet para procurar o endereço.", "erro"); });
+    };
+    $("#cm-sem").onclick = function () { loc = null; mostrarLoc(); };
+    $("#cm-slug").onblur = function () { this.value = slugDe(this.value) || slugDe(E.nome); };
+    $("#cm-salvar").onclick = function () {
+      var b = this, liga = $("#cm-vit").checked;
+      if (liga && !E.cidade) { $("#cm-msg").innerHTML = '<div class="aviso erro">Preencha a cidade em <a href="#marca">🏷️ Minha marca</a> para aparecer no Guia.</div>'; return; }
+      A.ocupado(b, true, "Salvando...");
+      var exato = ($('input[name="cm-exato"]:checked', c) || {}).value === "1", mp = $("#cm-maps").value.trim();
+      if (mp && !/^https:\/\//i.test(mp)) { A.ocupado(b, false); $("#cm-msg").innerHTML = '<div class="aviso erro">O link do Google Maps começa com https:// (copie pelo botão Compartilhar do seu perfil).</div>'; return; }
+      q(sb.rpc("salvar_vitrine", { p: { vitrine: liga, slug: slugDe($("#cm-slug").value), bairro: $("#cm-bairro").value, descricao: $("#cm-desc").value,
+        lat: loc ? Math.round(loc.lat * 1e6) / 1e6 : null, lng: loc ? Math.round(loc.lng * 1e6) / 1e6 : null, endereco: $("#cm-end").value, local_exato: exato,
+        raio_km: $("#cm-raio").value || null, maps_url: mp || null } })).then(function (n) {
+        E = Array.isArray(n) ? n[0] : n; A.avisar(liga ? "Vitrine ligada ✅" : "Salvo (vitrine desligada)", "ok"); verComunidade(c);
+      }).catch(function (e) { A.ocupado(b, false); $("#cm-msg").innerHTML = '<div class="aviso erro">' + esc(erroComunidade(e)) + "</div>"; });
+    };
+    if ($("#cm-copiar")) $("#cm-copiar").onclick = function () { A.copiar(link, "Link da vitrine copiado"); };
+    if (!E.vitrine) return;
+    // artes que estão na vitrine
+    q(sb.from("vitrine_artes").select("*").eq("empresa_id", E.id).order("criado_em", { ascending: false })).then(function (ls) {
+      $("#cm-artes").innerHTML = ls.length ? ls.map(function (a) {
+        return '<div class="arte-mini"><img alt="" src="' + esc(P.urlPub("vitrine", a.caminho)) + '"><button class="tirar" data-tirar="' + a.id + '" aria-label="Tirar da vitrine">🗑</button></div>';
+      }).join("") : '<span class="mudo peq">Nenhuma arte ainda.</span>';
+      $$("[data-tirar]", c).forEach(function (bt) {
+        bt.onclick = function () {
+          if (!window.confirm("Tirar esta arte da vitrine?")) return;
+          q(sb.rpc("tirar_da_vitrine", { p_id: bt.dataset.tirar })).then(function (cam) { if (cam) sb.storage.from("vitrine").remove([cam]).catch(function () {}); verComunidade(c); })
+            .catch(function (e) { A.avisar(erroComunidade(e), "erro"); });
+        };
+      });
+    }).catch(function (e) { $("#cm-artes").innerHTML = '<div class="aviso peq">' + esc(erroComunidade(e)) + "</div>"; });
+    verRede($("#cm-rede"), c);
+  }
+  function verRede(el, c) {
+    q(sb.rpc("minha_rede")).then(function (r) {
+      var ps = r.parceiros || [], me = r.me_recomendam || [], sug = r.sugestoes || [];
+      function mini(x, botoes) {
+        var img = x.logo ? P.urlPub("logos", x.logo) : "";
+        return '<div class="linha" style="padding:8px 0;border-top:1px solid var(--borda)">' + (img ? '<img alt="" src="' + esc(img) + '" style="width:44px;height:44px;object-fit:contain;background:#fff;border-radius:10px;border:1px solid var(--borda)">' : "") +
+          '<div style="flex:1;min-width:150px"><a class="forte" target="_blank" rel="noopener" href="' + esc(P.urlVitrine(x.slug)) + '">' + esc(x.nome) + '</a><div class="peq mudo">' + esc([x.ramo, x.cidade].filter(Boolean).join(" · ")) + "</div></div>" + botoes + "</div>";
+      }
+      el.innerHTML = '<h2>🤝 Minha rede</h2><p class="mudo peq">Recomende até 6 parceiros que completam o seu serviço. Eles aparecem como <b>“Recomendamos”</b> na sua vitrine, e você pode divulgar as artes deles nos seus Stories e status. ' +
+        "Indique quem você conhece e confia: é a sua reputação junto.</p>" +
+        "<h3>Recomendo (" + ps.length + " de 6)</h3>" + (ps.length ? ps.map(function (x, n) {
+          return mini(x, '<button class="peq zap" data-div="' + n + '">📤 Divulgar</button><button class="peq" data-tira="' + esc(x.slug) + '">Tirar</button>');
+        }).join("") : '<p class="mudo peq">Ninguém ainda. Veja as sugestões abaixo ou procure pelo nome.</p>') +
+        (me.length ? '<h3 style="margin-top:14px">Recomendam você (' + me.length + ")</h3>" + me.map(function (x) {
+          return mini(x, x.ja_recomendo ? '<span class="selo bom">vocês se recomendam</span>' : '<button class="peq prim" data-rec="' + esc(x.slug) + '">🤝 Recomendar de volta</button>');
+        }).join("") : "") +
+        '<h3 style="margin-top:14px">Procurar no Guia</h3><div class="linha"><input id="rd-busca" type="search" placeholder="Nome, ramo ou bairro (ex.: pintor, gesso, Palmeiras)" style="flex:1"><button class="peq" id="rd-ir">🔎 Procurar</button></div><div id="rd-res"></div>' +
+        (sug.length ? '<h3 style="margin-top:14px">Sugestões em ' + esc(E.cidade || "sua cidade") + "</h3>" + sug.map(function (x) { return mini(x, '<button class="peq" data-rec="' + esc(x.slug) + '">➕ Recomendar</button>'); }).join("") : "") +
+        '<p class="peq" style="margin-top:12px"><a target="_blank" rel="noopener" href="guia.html' + (E.cidade ? "?cidade=" + encodeURIComponent(E.cidade) : "") + '">🗺️ Abrir o Guia' + (E.cidade ? " de " + esc(E.cidade) : "") + "</a></p>";
+      function ligar(raiz) {
+        $$("[data-rec]", raiz).forEach(function (b) {
+          b.onclick = function () { A.ocupado(b, true, "..."); q(sb.rpc("recomendar", { p_slug: b.dataset.rec, p_sim: true })).then(function () { A.avisar("🤝 Parceiro adicionado à sua vitrine", "ok"); verRede(el, c); }).catch(function (e) { A.ocupado(b, false); A.avisar(erroComunidade(e), "erro"); }); };
+        });
+      }
+      ligar(el);
+      $$("[data-tira]", el).forEach(function (b) {
+        b.onclick = function () { if (!window.confirm("Tirar este parceiro da sua vitrine?")) return; q(sb.rpc("recomendar", { p_slug: b.dataset.tira, p_sim: false })).then(function () { verRede(el, c); }).catch(function (e) { A.avisar(erroComunidade(e), "erro"); }); };
+      });
+      $$("[data-div]", el).forEach(function (b) { b.onclick = function () { divulgarParceiro(ps[Number(b.dataset.div)], b); }; });
+      function procurar() {
+        var t = $("#rd-busca", el).value.trim(); if (t.length < 2) return;
+        P.rpc("guia", { p_cidade: null, p_ramo: null, p_busca: t }).then(function (ls) {
+          ls = ls.filter(function (x) { return x.slug !== E.slug; }).slice(0, 20);
+          $("#rd-res", el).innerHTML = ls.length ? ls.map(function (x) {
+            var ja = ps.some(function (p) { return p.slug === x.slug; });
+            return mini(x, ja ? '<span class="selo bom">já recomenda</span>' : '<button class="peq" data-rec="' + esc(x.slug) + '">➕ Recomendar</button>');
+          }).join("") : '<p class="mudo peq">Ninguém encontrado com esse nome no Guia.</p>';
+          ligar($("#rd-res", el));
+        }).catch(function (e) { A.avisar(erroComunidade(e), "erro"); });
+      }
+      $("#rd-ir", el).onclick = procurar;
+      $("#rd-busca", el).onkeydown = function (ev) { if (ev.key === "Enter") procurar(); };
+    }).catch(function (e) { el.innerHTML = '<h2>🤝 Minha rede</h2><div class="aviso">' + esc(erroComunidade(e)) + "</div>"; });
+  }
+  // 📤 divulga o parceiro: a arte mais nova dele (se tiver) + texto com o link da vitrine
+  function divulgarParceiro(x, b) {
+    var link = P.urlVitrine(x.slug), ig = x.instagram ? " " + (String(x.instagram).charAt(0) === "@" ? x.instagram : "@" + x.instagram) : "";
+    var txt = "🤝 Recomendo: " + x.nome + ig + (x.ramo ? " — " + x.ramo : "") + (x.cidade ? " em " + x.cidade : "") + "\n👉 " + link;
+    var arte = x.artes && x.artes[0] ? P.urlPub("vitrine", x.artes[0].caminho) : "";
+    A.copiar(txt, "Texto da recomendação copiado");
+    if (!navigator.share) return;
+    A.ocupado(b, true, "Abrindo...");
+    var pr = arte && podeCompartilhar() ? fetch(arte).then(function (r) { return r.blob(); }).then(function (bl) {
+      return navigator.share({ files: [new File([bl], "parceiro-" + x.slug + ".jpg", { type: bl.type || "image/jpeg" })], text: txt });
+    }) : navigator.share({ title: x.nome, text: txt });
+    pr.catch(function () { /* fechou o compartilhar: o texto já foi copiado */ }).then(function () { A.ocupado(b, false); });
+  }
+
   // ---------- Telegram: o robô da empresa publica a arte no canal dela ----------
   var TG = null; // { configurado, canal }
   // resposta sem "ok": a função "telegram" do servidor não é a do Anuncia Aí (ex.: ficou o código de exemplo do Supabase)
@@ -409,6 +590,38 @@
         q(sb.rpc("remover_telegram")).then(function () { TG = { configurado: false }; verTelegram(el); }).catch(function (e) { msg(esc(A.msgErro(e)), "erro"); });
       };
     });
+  }
+
+  // ---------- ✨ outros projetos ----------
+  function verMais(c) {
+    var ps = A.CFG.OUTROS_PROJETOS || [];
+    try { localStorage.setItem("anuncia_mais_visto_" + E.id, "1"); } catch (e) { /* sem armazenamento */ }
+    c.innerHTML = '<div class="cartao"><h2>✨ Mais apps</h2><p class="mudo peq">Outros projetos de quem faz o Anuncia Aí. Não precisa de outro cadastro para conhecer.</p></div>' +
+      (ps.length ? ps.map(function (p) {
+        return '<div class="cartao"><div class="linha"><span style="font-size:32px">' + esc(p.ic || "✨") + '</span><h2 style="flex:1">' + esc(p.nome) + "</h2>" +
+          (p.em_breve ? '<span class="selo atencao">em breve</span>' : "") + "</div>" + (p.desc ? '<p style="margin:8px 0">' + esc(p.desc) + "</p>" : "") +
+          ((p.itens || []).length ? '<ul class="peq" style="margin:0 0 8px;padding-left:20px">' + p.itens.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") + "</ul>" : "") +
+          '<div class="acoes">' + (p.em_breve ? '<button class="prim" data-aviso="' + esc(p.id) + '">🔔 Quero ser avisado</button>' : "") +
+          (p.link ? '<a class="botao' + (p.em_breve ? "" : " prim") + '" target="_blank" rel="noopener" href="' + esc(p.link) + '">' + esc(p.link_nome || "Conhecer") + "</a>" : "") +
+          (p.link2 ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(p.link2) + '">' + esc(p.link2_nome || "Ver mais") + "</a>" : "") +
+          (p.whatsapp ? '<a class="botao zap" target="_blank" rel="noopener" href="' + esc(A.linkZap(p.whatsapp, "Olá! Sou da " + E.nome + " (uso o Anuncia Aí) e quero saber mais sobre " + p.nome + ".")) + '">💬 WhatsApp</a>' : "") +
+          "</div></div>";
+      }).join("") : '<div class="cartao vazio">Em breve.</div>');
+    var marcados = {};
+    function botoes() {
+      $$("[data-aviso]", c).forEach(function (b) {
+        var sim = !!marcados[b.dataset.aviso];
+        b.textContent = sim ? "✅ Você será avisado (tocar para cancelar)" : "🔔 Quero ser avisado"; b.classList.toggle("prim", !sim);
+        b.onclick = function () {
+          A.ocupado(b, true, "...");
+          q(sb.rpc("quero_ser_avisado", { p_projeto: b.dataset.aviso, p_sim: !sim })).then(function () {
+            A.ocupado(b, false); if (sim) delete marcados[b.dataset.aviso]; else marcados[b.dataset.aviso] = 1;
+            if (!sim) A.avisar("🔔 Combinado! Avisamos você quando lançar.", "ok"); botoes();
+          }).catch(function (e) { A.ocupado(b, false); A.avisar(erroComunidade(e).replace("Comunidade", "lista de espera"), "erro"); });
+        };
+      });
+    }
+    q(sb.from("interesses").select("projeto").eq("empresa_id", E.id)).then(function (ls) { ls.forEach(function (x) { marcados[x.projeto] = 1; }); botoes(); }).catch(function () { botoes(); });
   }
 
   // ---------- sugestões ----------
