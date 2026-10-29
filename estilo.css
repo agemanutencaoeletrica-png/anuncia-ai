@@ -114,3 +114,11 @@ tr.clic { cursor: pointer; } tr.clic:hover { background: var(--sup2); }
 @media (max-width: 640px) { .filtros-guia { grid-template-columns: 1fr; } }
 .mapa { height: 240px; border-radius: 12px; overflow: hidden; border: 1px solid var(--borda); z-index: 0; }
 .mapa.grande { height: 62vh; min-height: 360px; margin-bottom: 14px; }
+.links-lista { display: grid; gap: 8px; }
+.link-linha { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--borda); border-radius: 12px; background: var(--sup2); color: var(--texto); text-decoration: none; }
+.link-linha:hover { border-color: var(--prim); }
+.link-linha.zap { background: #16a34a; border-color: #16a34a; color: #fff; }
+.link-linha .ic { font-size: 22px; width: 28px; text-align: center; }
+.link-linha > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.link-linha small { opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-linha .seta { font-size: 22px; opacity: .6; }

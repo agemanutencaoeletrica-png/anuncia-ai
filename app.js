@@ -402,6 +402,9 @@
       '<label for="cm-slug">Endereço da página</label><div class="linha"><span class="peq mudo">…/vitrine.html?e=</span><input id="cm-slug" maxlength="60" autocapitalize="none" spellcheck="false" style="flex:1;min-width:160px"></div>' +
       '<div class="duas"><div><label for="cm-bairro">Bairro onde atende</label><input id="cm-bairro" maxlength="80"></div><div><label>Cidade</label><input disabled value="' + esc(E.cidade || "— preencha em Minha marca") + '"></div></div>' +
       '<label for="cm-desc">Sobre a empresa</label><textarea id="cm-desc" rows="4" maxlength="500" placeholder="O que você faz, onde atende, horário, diferenciais"></textarea>' +
+      '<h3 style="margin-top:16px">🔗 Site e redes sociais</h3><p class="mudo peq" style="margin:2px 0 0">Aparecem juntos na vitrine e na mensagem de divulgar. Pode colar o link completo ou só o @usuário.</p>' +
+      '<div class="duas"><div><label for="cm-site">🌐 Site</label><input id="cm-site" maxlength="120" inputmode="url" placeholder="www.suaempresa.com.br"></div><div><label for="cm-ig">📷 Instagram</label><input id="cm-ig" maxlength="60" placeholder="@suaempresa"></div></div>' +
+      '<div class="duas">' + P.REDES.map(function (r) { return '<div><label for="cm-r-' + r[0] + '">' + r[2] + " " + r[1] + '</label><input id="cm-r-' + r[0] + '" data-rede="' + r[0] + '" maxlength="200" autocapitalize="none" spellcheck="false" placeholder="link ou @usuário"></div>'; }).join("") + "</div>" +
       '<h3 style="margin-top:16px">📍 No mapa (opcional)</h3><p class="mudo peq" style="margin:2px 0 0">Para aparecer no mapa do Guia e no “📍 Perto de mim” de quem procura.</p>' +
       '<label for="cm-end">Endereço</label><input id="cm-end" maxlength="200" placeholder="Rua e número (não aparece se você escolher “só a região”)">' +
       '<div class="linha" style="margin-top:6px"><button class="peq" id="cm-gps">📍 Usar minha localização</button><button class="peq" id="cm-achar">🔎 Achar pelo endereço</button><button class="peq oculto" id="cm-sem">Tirar do mapa</button></div>' +
@@ -419,10 +422,15 @@
       "<li>Pronto no Google: abra o seu perfil no Google Maps, toque em <b>Compartilhar</b>, copie o link e cole aqui em cima. Na sua vitrine aparece o botão ⭐ Avaliações no Google.</li></ol></details>" +
       '<div id="cm-msg"></div><div class="acoes"><button class="prim" id="cm-salvar">Salvar</button>' +
       (E.vitrine && link ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(link) + '">👁 Ver minha vitrine</a><button id="cm-copiar">📋 Copiar link</button>' : "") + "</div>" +
+      (E.vitrine && link ? '<h3 style="margin-top:16px">📤 Divulgar minha vitrine</h3><p class="mudo peq" style="margin:2px 0 6px">Mensagem pronta com todos os seus links, para grupos de WhatsApp, Facebook, Telegram e onde quiser. Pode editar antes de mandar.</p>' +
+        '<textarea id="cm-msg-div" rows="9"></textarea>' + P.htmlDivulgar("cd") : "") +
       (E.vitrine ? '<h3 style="margin-top:16px">Artes na vitrine</h3><p class="mudo peq">Em 🎨 Criar arte, toque em <b>📌 Pôr na minha vitrine</b>. Ficam as 12 mais novas.</p><div id="cm-artes" class="artes-grade"><span class="mudo peq">Carregando...</span></div>' : "") + "</div>" +
       '<div class="cartao" id="cm-rede"><h2>🤝 Minha rede</h2>' + (E.vitrine ? '<div class="mudo peq">Carregando...</div>' :
         '<p class="mudo peq">Ligue a sua vitrine para entrar na rede: você recomenda até 6 parceiros que completam o seu serviço (ex.: o eletricista indica o pintor), eles aparecem na sua vitrine e você divulga as artes deles. Eles podem fazer o mesmo por você.</p>') + "</div>";
     $("#cm-vit").checked = !!E.vitrine; $("#cm-slug").value = E.slug || slugDe(E.nome); $("#cm-bairro").value = E.bairro || ""; $("#cm-desc").value = E.descricao || "";
+    $("#cm-site").value = E.site || ""; $("#cm-ig").value = E.instagram || "";
+    $$("[data-rede]", c).forEach(function (i) { i.value = (E.redes || {})[i.dataset.rede] || ""; });
+    if ($("#cm-msg-div")) { $("#cm-msg-div").value = P.textoDivulgar(E); P.ligarDivulgar(c, "cd", E, function () { return $("#cm-msg-div").value; }); }
     $("#cm-end").value = E.endereco || ""; $("#cm-raio").value = E.raio_km ? String(E.raio_km) : ""; $("#cm-maps").value = E.maps_url || "";
     $$('input[name="cm-exato"]', c).forEach(function (r) { r.checked = r.value === (E.local_exato ? "1" : "0"); });
     // 📍 ponto no mapa: GPS do aparelho ou endereço; dá para arrastar o marcador para acertar
@@ -470,12 +478,22 @@
       var b = this, liga = $("#cm-vit").checked;
       if (liga && !E.cidade) { $("#cm-msg").innerHTML = '<div class="aviso erro">Preencha a cidade em <a href="#marca">🏷️ Minha marca</a> para aparecer no Guia.</div>'; return; }
       A.ocupado(b, true, "Salvando...");
-      var exato = ($('input[name="cm-exato"]:checked', c) || {}).value === "1", mp = $("#cm-maps").value.trim();
+      var exato = ($('input[name="cm-exato"]:checked', c) || {}).value === "1", mp = $("#cm-maps").value.trim(), redes = {};
+      $$("[data-rede]", c).forEach(function (i) { var v = i.value.trim(); if (v) redes[i.dataset.rede] = v; });
+      var ruim = Object.keys(redes).filter(function (k) { return !/^https:\/\/\S+$/i.test(redes[k]) && !/^@?[A-Za-z0-9._-]{2,60}$/.test(redes[k]); });
+      if (ruim.length) { A.ocupado(b, false); $("#cm-msg").innerHTML = '<div class="aviso erro">Confira ' + esc(ruim.map(function (k) { return P.REDES.filter(function (r) { return r[0] === k; })[0][1]; }).join(", ")) + ": cole o link que começa com https:// ou só o @usuário.</div>"; return; }
+      var site = $("#cm-site").value.trim(), ig = $("#cm-ig").value.trim();
+      // site e Instagram são da 🏷️ Minha marca: grava lá também (com os outros dados da marca como estão)
+      var pMarca = site !== (E.site || "") || ig !== (E.instagram || "") ? q(sb.rpc("salvar_perfil", { p: { nome: E.nome, ramo: E.ramo || "", cidade: E.cidade || "", whatsapp: E.whatsapp || "",
+        instagram: ig, site: site, cor1: E.cor1, cor2: E.cor2, aceita_whatsapp: E.aceita_whatsapp !== false } })).then(function (n) { E = Array.isArray(n) ? n[0] : n; }) : Promise.resolve();
       if (mp && !/^https:\/\//i.test(mp)) { A.ocupado(b, false); $("#cm-msg").innerHTML = '<div class="aviso erro">O link do Google Maps começa com https:// (copie pelo botão Compartilhar do seu perfil).</div>'; return; }
-      q(sb.rpc("salvar_vitrine", { p: { vitrine: liga, slug: slugDe($("#cm-slug").value), bairro: $("#cm-bairro").value, descricao: $("#cm-desc").value,
+      pMarca.then(function () { return q(sb.rpc("salvar_vitrine", { p: { vitrine: liga, slug: slugDe($("#cm-slug").value), bairro: $("#cm-bairro").value, descricao: $("#cm-desc").value, redes: redes,
         lat: loc ? Math.round(loc.lat * 1e6) / 1e6 : null, lng: loc ? Math.round(loc.lng * 1e6) / 1e6 : null, endereco: $("#cm-end").value, local_exato: exato,
-        raio_km: $("#cm-raio").value || null, maps_url: mp || null } })).then(function (n) {
-        E = Array.isArray(n) ? n[0] : n; A.avisar(liga ? "Vitrine ligada ✅" : "Salvo (vitrine desligada)", "ok"); verComunidade(c);
+        raio_km: $("#cm-raio").value || null, maps_url: mp || null } })); }).then(function (n) {
+        E = Array.isArray(n) ? n[0] : n;
+        if (Object.keys(redes).length && !E.redes) A.avisar("As redes sociais não foram salvas: rode de novo o supabase/comunidade.sql no Supabase.", "erro");
+        else A.avisar(liga ? "Vitrine ligada ✅" : "Salvo (vitrine desligada)", "ok");
+        verComunidade(c);
       }).catch(function (e) { A.ocupado(b, false); $("#cm-msg").innerHTML = '<div class="aviso erro">' + esc(erroComunidade(e)) + "</div>"; });
     };
     if ($("#cm-copiar")) $("#cm-copiar").onclick = function () { A.copiar(link, "Link da vitrine copiado"); };

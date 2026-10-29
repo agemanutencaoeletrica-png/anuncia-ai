@@ -46,6 +46,69 @@
   }
   function linkRota(c) { return "https://www.google.com/maps/dir/?api=1&destination=" + (c.exato ? c.lat + "," + c.lng : encodeURIComponent([c.endereco || c.bairro, c.cidade].filter(Boolean).join(", "))); }
   function km(v) { return Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " km"; }
+  // 🔗 redes sociais: aceita o link completo ou só o @usuário
+  var REDES = [["facebook", "Facebook", "📘"], ["tiktok", "TikTok", "🎵"], ["youtube", "YouTube", "▶️"], ["telegram", "Telegram", "✈️"], ["kwai", "Kwai", "🎬"],
+    ["threads", "Threads", "🧵"], ["linkedin", "LinkedIn", "💼"], ["x", "X (Twitter)", "✖️"], ["pinterest", "Pinterest", "📌"]];
+  var BASE_REDE = { facebook: "https://www.facebook.com/", tiktok: "https://www.tiktok.com/@", youtube: "https://www.youtube.com/@", telegram: "https://t.me/",
+    kwai: "https://www.kwai.com/@", threads: "https://www.threads.net/@", linkedin: "https://www.linkedin.com/company/", x: "https://x.com/", pinterest: "https://www.pinterest.com/" };
+  function urlRede(k, v) { v = String(v || "").trim(); if (!v) return ""; return /^https?:\/\//i.test(v) ? v : (BASE_REDE[k] || "https://") + encodeURIComponent(v.replace(/^@/, "")); }
+  function curto(u) { return String(u || "").replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, ""); }
+  // todos os links da empresa, na ordem em que aparecem (WhatsApp primeiro)
+  function linksDe(c) {
+    var ls = [], r = c.redes || {};
+    if (c.whatsapp) ls.push({ ic: "💬", nome: "WhatsApp", url: A.linkZap(c.whatsapp, msgZap(c)), mostra: c.whatsapp, zap: true });
+    if (c.instagram) ls.push({ ic: "📷", nome: "Instagram", url: urlInsta(c.instagram), mostra: "@" + String(c.instagram).replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "") });
+    REDES.forEach(function (x) { if (r[x[0]]) ls.push({ ic: x[2], nome: x[1], url: urlRede(x[0], r[x[0]]), mostra: /^https?:/i.test(r[x[0]]) ? curto(r[x[0]]) : "@" + String(r[x[0]]).replace(/^@/, "") }); });
+    if (c.site) ls.push({ ic: "🌐", nome: "Site", url: urlSite(c.site), mostra: curto(urlSite(c.site)) });
+    if (c.maps_url) ls.push({ ic: "⭐", nome: "Google Maps (avaliações)", url: c.maps_url, mostra: "Ver no Google" });
+    return ls;
+  }
+  // mensagem pronta para grupos de WhatsApp, Facebook e Telegram
+  function textoDivulgar(c) {
+    var t = "⭐ *" + c.nome + "*" + (local(c) ? "\n" + local(c) : "") + (c.descricao ? "\n\n" + String(c.descricao).slice(0, 220) : "") + "\n";
+    linksDe(c).forEach(function (l) { t += "\n" + l.ic + " " + l.nome + ": " + (l.zap ? "wa.me/" + (function (n) { return n.length <= 11 ? "55" + n : n; })(A.soDigitos(c.whatsapp)) : l.nome === "Google Maps (avaliações)" ? l.url : curto(l.url)); });
+    return t + "\n\n👉 Todos os links e novidades: " + urlVitrine(c.slug);
+  }
+  // botões de divulgar: WhatsApp (grupos e contatos), Facebook, Telegram, copiar e QR Code
+  function htmlDivulgar(pref) {
+    return '<div class="acoes" style="margin-top:8px"><a class="botao zap" id="' + pref + '-zap" target="_blank" rel="noopener">💬 WhatsApp (grupos)</a><a class="botao" id="' + pref + '-fb" target="_blank" rel="noopener">📘 Facebook</a>' +
+      '<a class="botao" id="' + pref + '-tg" target="_blank" rel="noopener">✈️ Telegram</a><button id="' + pref + '-copiar">📋 Copiar mensagem</button><button id="' + pref + '-link">🔗 Copiar link</button><button id="' + pref + '-qr">🔳 QR Code</button></div>';
+  }
+  var qrPronto = null;
+  function carregarQr() {
+    if (window.qrcode) return Promise.resolve(window.qrcode);
+    if (!qrPronto) qrPronto = new Promise(function (ok, falha) {
+      var sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js";
+      sc.onload = function () { window.qrcode ? ok(window.qrcode) : falha(new Error("QR indisponível.")); };
+      sc.onerror = function () { qrPronto = null; sc.remove(); falha(new Error("Sem internet para gerar o QR Code.")); };
+      document.head.appendChild(sc);
+    });
+    return qrPronto;
+  }
+  function ligarDivulgar(raiz, pref, c, texto) {
+    var link = urlVitrine(c.slug), txt = function () { return typeof texto === "function" ? texto() : texto || textoDivulgar(c); };
+    var zap = raiz.querySelector("#" + pref + "-zap"), fb = raiz.querySelector("#" + pref + "-fb"), tg = raiz.querySelector("#" + pref + "-tg");
+    function atualizar() {
+      zap.href = "https://wa.me/?text=" + encodeURIComponent(txt());
+      fb.href = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(link);
+      tg.href = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(txt().replace(/\n*👉[^\n]*$/, ""));
+    }
+    atualizar(); [zap, fb, tg].forEach(function (a) { a.addEventListener("click", atualizar); });
+    raiz.querySelector("#" + pref + "-copiar").onclick = function () { A.copiar(txt(), "Mensagem copiada: cole no grupo"); };
+    raiz.querySelector("#" + pref + "-link").onclick = function () { A.copiar(link, "Link copiado"); };
+    raiz.querySelector("#" + pref + "-qr").onclick = function () {
+      var b = this; A.ocupado(b, true, "Gerando...");
+      carregarQr().then(function (Q) {
+        A.ocupado(b, false);
+        var qr = Q(0, "M"); qr.addData(link); qr.make();
+        var img = qr.createDataURL(8, 4);
+        var j = A.janela('<p class="peq mudo" style="margin-top:0">Imprima no cartão de visita, na placa da obra, no adesivo do carro ou no orçamento: quem aponta a câmera do celular abre a sua vitrine.</p>' +
+          '<div style="text-align:center"><img id="qr-img" alt="QR Code da vitrine" src="' + img + '" style="width:260px;max-width:80vw;image-rendering:pixelated;background:#fff;padding:8px;border-radius:12px"></div>' +
+          '<p class="peq" style="text-align:center;word-break:break-all">' + esc(link) + '</p><div class="acoes" style="justify-content:center"><a class="botao prim" download="qrcode-' + esc(c.slug) + '.gif" href="' + img + '">⬇ Baixar QR Code</a></div>', { titulo: "🔳 QR Code de " + c.nome });
+        void j;
+      }).catch(function (e) { A.ocupado(b, false); A.avisar(A.msgErro(e), "erro"); });
+    };
+  }
   function msgZap(c) { return "Olá, " + c.nome + "! Vi vocês no Guia Anuncia Aí e gostaria de um orçamento."; }
 
   // cartão de empresa (guia e "Recomendamos")
@@ -75,10 +138,12 @@
         (Number(v.recomendada_por) ? '<p class="vit-rec">🤝 Recomendada por ' + Number(v.recomendada_por) + " empresa" + (Number(v.recomendada_por) > 1 ? "s" : "") + " da comunidade</p>" : "") +
         '<div class="acoes" style="justify-content:center">' + (v.whatsapp ? '<a class="botao zap" target="_blank" rel="noopener" href="' + esc(A.linkZap(v.whatsapp, msgZap(v))) + '">💬 Chamar no WhatsApp</a>' : "") +
         (v.instagram ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(urlInsta(v.instagram)) + '">📷 Instagram</a>' : "") +
-        (v.site ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(urlSite(v.site)) + '">🌐 Site</a>' : "") +
         (v.maps_url ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(v.maps_url) + '">⭐ Avaliações no Google</a>' : "") +
         '<button class="botao" id="vt-comp">📤 Compartilhar</button></div></header><main>' +
         (v.descricao ? '<div class="cartao" style="white-space:pre-wrap">' + esc(v.descricao) + "</div>" : "") +
+        (linksDe(v).length ? '<div class="cartao"><h2 style="margin-bottom:8px">🔗 Nossos links</h2><div class="links-lista">' + linksDe(v).map(function (l) {
+          return '<a class="link-linha' + (l.zap ? " zap" : "") + '" target="_blank" rel="noopener" href="' + esc(l.url) + '"><span class="ic">' + l.ic + '</span><span><b>' + esc(l.nome) + '</b><small>' + esc(l.mostra) + "</small></span><span class=\"seta\">›</span></a>";
+        }).join("") + "</div></div>" : "") +
         (temLocal(v) || v.endereco ? '<div class="cartao"><h2 style="margin-bottom:6px">📍 ' + (v.exato ? "Onde estamos" : "Região de atendimento") + "</h2>" +
           '<p class="peq mudo" style="margin:0 0 8px">' + esc(v.exato ? [v.endereco, v.bairro, v.cidade].filter(Boolean).join(" · ") : "Atende " + [v.bairro, v.cidade].filter(Boolean).join(" · ") + (v.raio_km ? " e até " + v.raio_km + " km" : "")) + "</p>" +
           (temLocal(v) ? '<div id="vt-mapa" class="mapa"></div>' : "") +
@@ -88,6 +153,7 @@
           return '<button class="arte-mini" data-arte="' + n + '"><img loading="lazy" alt="' + esc(String(a.legenda || "Arte de " + v.nome).slice(0, 120)) + '" src="' + esc(urlPub("vitrine", a.caminho)) + '"></button>';
         }).join("") + "</div>" : "") +
         ((v.parceiros || []).length ? '<h2 style="margin:18px 0 10px">🤝 Recomendamos</h2><div class="emp-grade">' + v.parceiros.map(cartaoEmpresa).join("") + "</div>" : "") +
+        '<div class="cartao" style="margin-top:14px"><h2>📤 Divulgue ' + esc(v.nome) + '</h2><p class="peq mudo" style="margin:4px 0 0">Mande para os seus grupos e contatos: vai a mensagem com todos os links.</p>' + htmlDivulgar("vd") + "</div>" +
         '<p class="mudo peq" style="text-align:center;margin-top:22px"><a href="guia.html' + (v.cidade ? "?cidade=" + encodeURIComponent(v.cidade) : "") + '">🗺️ Mais empresas' + (v.cidade ? " em " + esc(v.cidade) : "") + "</a> · " +
         '<a href="index.html">Crie a vitrine da sua empresa no Anuncia Aí</a></p></main>';
       if ($("#vt-mapa")) novoMapa($("#vt-mapa"), v.lat, v.lng, v.exato ? 16 : 13).then(function (x) {
@@ -99,8 +165,9 @@
         telephone: v.whatsapp || undefined, image: v.logo ? urlPub("logos", v.logo) : undefined,
         address: { "@type": "PostalAddress", streetAddress: v.exato ? v.endereco || undefined : undefined, addressLocality: v.cidade || undefined, addressRegion: undefined, addressCountry: "BR" },
         geo: v.exato && temLocal(v) ? { "@type": "GeoCoordinates", latitude: v.lat, longitude: v.lng } : undefined,
-        sameAs: [v.instagram ? urlInsta(v.instagram) : null, v.maps_url || null, v.site ? urlSite(v.site) : null].filter(Boolean) };
+        sameAs: linksDe(v).filter(function (l) { return !l.zap; }).map(function (l) { return l.url; }) };
       var sc = document.createElement("script"); sc.type = "application/ld+json"; sc.textContent = JSON.stringify(ld); document.head.appendChild(sc);
+      ligarDivulgar(alvo, "vd", v);
       $("#vt-comp").onclick = function () {
         var d = { title: v.nome, text: v.nome + (local(v) ? " — " + local(v) : ""), url: location.href };
         if (navigator.share) navigator.share(d).catch(function () {}); else A.copiar(location.href, "Link copiado");
@@ -189,7 +256,8 @@
     buscar();
   }
 
-  window.AN_PUB = { rpc: rpc, urlPub: urlPub, urlVitrine: urlVitrine, cartaoEmpresa: cartaoEmpresa, novoMapa: novoMapa };
+  window.AN_PUB = { rpc: rpc, urlPub: urlPub, urlVitrine: urlVitrine, cartaoEmpresa: cartaoEmpresa, novoMapa: novoMapa,
+    REDES: REDES, linksDe: linksDe, textoDivulgar: textoDivulgar, htmlDivulgar: htmlDivulgar, ligarDivulgar: ligarDivulgar };
   var alvo = document.getElementById("pub");
   if (!alvo) return;
   if (!A.configurado()) { A.telaSemConfig(alvo); return; }
