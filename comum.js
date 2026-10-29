@@ -52,7 +52,10 @@
     var fechado = false;
     function fechar() { if (fechado) return; fechado = true; f.remove(); if (!$(".fundo-modal")) document.body.style.overflow = ""; if (op.aoFechar) op.aoFechar(); }
     $(".fechar", f).onclick = fechar;
-    f.addEventListener("mousedown", function (ev) { if (ev.target === f && !op.fixa) fechar(); });
+    // fecha ao clicar FORA da janela — mas não ao usar a barra de rolagem (ela é parte do fundo): o clique começa e termina no fundo
+    var comecouFora = false;
+    f.addEventListener("mousedown", function (ev) { comecouFora = ev.target === f && ev.clientX < f.clientWidth && ev.clientY < f.clientHeight; });
+    f.addEventListener("click", function (ev) { if (comecouFora && ev.target === f && !op.fixa) fechar(); comecouFora = false; });
     return { el: $(".corpo", f), fechar: fechar };
   }
   function ocupado(b, sim, txt) {
