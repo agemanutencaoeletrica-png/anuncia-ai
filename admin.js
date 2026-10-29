@@ -47,12 +47,15 @@
     $("#b-sair").onclick = function () { sb.auth.signOut(); };
     $("#b-rec").onclick = function () { carregar().then(function () { rota(); A.avisar("Atualizado"); }); };
     window.addEventListener("hashchange", rota); rota();
+    var nv = (S.sug || []).filter(function (x) { return !x.lida; }).length;
+    if (nv) A.avisar("💡 " + nv + (nv > 1 ? " sugestões novas" : " sugestão nova") + " dos clientes", "ok");
   }
   var ABAS = [["empresas", "Empresas"], ["pagamentos", "Pagamentos"], ["avisos", "Avisos enviados"], ["sugestoes", "Sugestões"], ["interessados", "✨ Interessados"], ["planos", "Planos"]];
   function rota() {
     var aba = location.hash.slice(1) || "empresas"; if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "empresas";
     var novas = (S.sug || []).filter(function (x) { return !x.lida; }).length;
-    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" && novas ? " (" + novas + ")" : "") + "</a>"; }).join("");
+    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" && novas ? '<span class="bolinha" aria-label="' + novas + ' novas">' + novas + "</span>" : "") + "</a>"; }).join("");
+    document.title = (novas ? "(" + novas + ") " : "") + "Anuncia Aí — Painel";
     ({ empresas: verEmpresas, pagamentos: verPagamentos, avisos: verAvisos, sugestoes: verSugestoes, interessados: verInteressados, planos: verPlanos })[aba]($("#conteudo"));
   }
   function nomePlano(id) { var p = S.planos.filter(function (x) { return x.id === id; })[0]; return p ? p.nome : id || "—"; }
@@ -181,8 +184,8 @@
     c.innerHTML = '<div class="cartao"><h2>Sugestões dos clientes</h2><p class="mudo peq">Chegam pela aba “💡 Sugestões” do app. A resposta aparece para o cliente lá mesmo.</p>' +
       (S.sug.length ? S.sug.map(function (x) {
         var e = emp(x.empresa_id);
-        return '<div style="padding:12px 0;border-top:1px solid var(--borda)" data-sug="' + esc(x.id) + '"><b>' + esc(e.nome) + '</b> <span class="selo">' + esc(rot[x.tipo] || x.tipo) + "</span> " +
-          (x.lida ? '<span class="selo bom">lida</span>' : '<span class="selo atencao">nova</span>') + ' <span class="peq mudo">' + A.dataHora(x.criado_em) + "</span>" +
+        return '<div style="padding:12px 0;border-top:1px solid var(--borda)" data-sug="' + esc(x.id) + '"' + (x.lida ? "" : ' class="sug-nova" data-nova') + '><b>' + esc(e.nome) + '</b> <span class="selo">' + esc(rot[x.tipo] || x.tipo) + "</span> " +
+          (x.lida ? '<span class="selo bom">lida</span>' : '<span class="selo critico">🔴 nova</span>') + (x.resposta ? ' <span class="selo bom">✅ respondida</span>' : "") + ' <span class="peq mudo">' + A.dataHora(x.criado_em) + "</span>" +
           '<div style="margin:6px 0;white-space:pre-wrap">' + esc(x.texto) + "</div>" +
           '<textarea rows="2" maxlength="1000" placeholder="Resposta (o cliente vê no app)">' + esc(x.resposta || "") + "</textarea>" +
           '<div class="acoes" style="margin-top:6px"><button class="peq prim" data-resp>Salvar resposta</button>' + (x.lida ? "" : '<button class="peq" data-lida>✓ Marcar lida</button>') +
@@ -198,6 +201,26 @@
       $("[data-resp]", el).onclick = function () { salvar(id, { resposta: $("textarea", el).value.trim() || null, lida: true }, "Resposta salva"); };
       if ($("[data-lida]", el)) $("[data-lida]", el).onclick = function () { salvar(id, { lida: true }, "Marcada como lida"); };
     });
+    // vista na tela = lida: grava sozinho (continua vermelha até sair da aba, para você saber quais eram novas)
+    var vistas = {}, tGrava = null;
+    function gravarVistas() {
+      var ids = Object.keys(vistas); vistas = {};
+      if (!ids.length) return;
+      q(sb.from("sugestoes").update({ lida: true }).in("id", ids).select()).then(function (r) {
+        r.forEach(function (n) { var x = S.sug.filter(function (s) { return s.id === n.id; })[0]; if (x) x.lida = true; });
+        var novas = S.sug.filter(function (x) { return !x.lida; }).length, ab = $('#abas a[href="#sugestoes"]');
+        if (ab) ab.innerHTML = "Sugestões" + (novas ? '<span class="bolinha">' + novas + "</span>" : "");
+        document.title = (novas ? "(" + novas + ") " : "") + "Anuncia Aí — Painel";
+      }).catch(function () { /* tenta de novo na próxima vez que abrir */ });
+    }
+    var novasEl = $$("[data-nova]", c);
+    if (novasEl.length && "IntersectionObserver" in window) {
+      var ob = new IntersectionObserver(function (es) {
+        es.forEach(function (en) { if (en.isIntersecting && en.intersectionRatio >= 0.6) { vistas[en.target.dataset.sug] = 1; ob.unobserve(en.target); } });
+        clearTimeout(tGrava); tGrava = setTimeout(gravarVistas, 1500);
+      }, { threshold: [0.6] });
+      novasEl.forEach(function (el) { ob.observe(el); });
+    } else if (novasEl.length) { novasEl.forEach(function (el) { vistas[el.dataset.sug] = 1; }); tGrava = setTimeout(gravarVistas, 1500); }
   }
   function verPlanos(c) {
     c.innerHTML = '<div class="cartao"><h2>Planos e preços</h2><p class="mudo peq">Novos pagamentos usam o preço daqui. Quem já assina no cartão continua no valor da assinatura dele.</p>' +
