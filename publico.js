@@ -3,7 +3,7 @@
 // (vitrine_publica, guia, guia_filtros): nada de e-mail, pagamento ou situação da assinatura.
 (function () {
   "use strict";
-  var A = window.AN, esc = A.esc, $ = A.$, CFG = A.CFG;
+  var A = window.AN, esc = A.esc, $ = A.$, CFG = A.CFG, REDE = CFG.NOME_REDE || "Comunidade Anuncia Aí";
 
   function rpc(nome, args) {
     return fetch(CFG.SUPABASE_URL + "/rest/v1/rpc/" + nome, {
@@ -119,7 +119,7 @@
   }
   // 🏛️ convite para a comunidade (vitrine, guia e site)
   function htmlConvite() {
-    return '<section class="convite"><div class="convite-sel">Comunidade Anuncia Aí</div><h2>Venha fazer parte da nossa rede</h2>' +
+    return '<section class="convite"><div class="convite-sel">' + esc(REDE) + '</div><h2>Venha fazer parte da nossa rede</h2>' +
       "<p>Reunimos empresas que acreditam no trabalho bem feito e na força da boa indicação. Aqui, cada negócio tem a sua vitrine, é encontrado por quem está perto " +
       "e caminha ao lado de parceiros que se recomendam.</p><ul>" +
       "<li><b>Uma vitrine elegante</b>, com seus links, mapa, avaliações e novidades</li>" +
@@ -131,12 +131,12 @@
   }
   // convite que uma empresa manda para um parceiro (WhatsApp)
   function textoConvite(c) {
-    return "Olá! Tudo bem?\n\nAqui é da *" + c.nome + "*. Fazemos parte da *Comunidade Anuncia Aí*, uma rede de empresas da região que se apoiam e se recomendam, e lembramos de você pelo trabalho sério que faz.\n\n" +
+    return "Olá! Tudo bem?\n\nAqui é da *" + c.nome + "*. Fazemos parte da *" + REDE + "*, uma rede de empresas da região que se apoiam e se recomendam, e lembramos de você pelo trabalho sério que faz.\n\n" +
       "Lá cada empresa tem uma vitrine profissional, aparece no Guia da cidade e no “Perto de mim” de quem procura, e cria artes para as redes em um minuto.\n\n" +
       "Seria uma alegria ter a sua empresa como parceira e recomendar o seu trabalho na nossa página.\n\n" +
       "✨ Conheça e teste 7 dias grátis: " + new URL("index.html", location.href).href + (c.slug ? "\n🔗 Nossa vitrine: " + urlVitrine(c.slug) : "");
   }
-  function msgZap(c) { return "Olá, " + c.nome + "! Vi vocês no Guia Anuncia Aí e gostaria de um orçamento."; }
+  function msgZap(c) { return "Olá, " + c.nome + "! Vi vocês no Guia " + REDE + " e gostaria de um orçamento."; }
 
   // cartão de empresa (guia e "Recomendamos")
   function cartaoEmpresa(c) {
@@ -155,7 +155,7 @@
     var slug = new URLSearchParams(location.search).get("e") || "";
     if (!slug) { location.replace("guia.html"); return; }
     rpc("vitrine_publica", { p_slug: slug }).then(function (v) {
-      if (!v) { alvo.innerHTML = '<main><div class="cartao vazio">Esta vitrine não está disponível. <a href="guia.html">Ver o Guia Anuncia Aí</a></div></main>'; return; }
+      if (!v) { alvo.innerHTML = '<main><div class="cartao vazio">Esta vitrine não está disponível. <a href="guia.html">Ver o Guia ' + esc(REDE) + "</a></div></main>"; return; }
       var c1 = cor(v.cor1, "#7c3aed"), c2 = cor(v.cor2, "#f59e0b");
       document.title = v.nome + " — " + (v.ramo || "Vitrine") + (v.cidade ? " em " + v.cidade : "") + " | Anuncia Aí";
       var md = document.querySelector('meta[name="description"]'); if (md) md.setAttribute("content", (v.descricao || local(v) || v.nome).slice(0, 160));
@@ -215,8 +215,9 @@
 
   // ---------- guia por cidade e ramo ----------
   function verGuia(alvo) {
+    document.title = "Guia " + REDE + " — empresas da sua cidade";
     var qs = new URLSearchParams(location.search), F = { cidade: qs.get("cidade") || "", ramo: qs.get("ramo") || "", busca: qs.get("q") || "" };
-    alvo.innerHTML = '<header class="vit-topo"><h1>🗺️ Guia Anuncia Aí</h1><p>Empresas e profissionais da sua região. Chame direto no WhatsApp.</p></header><main>' +
+    alvo.innerHTML = '<header class="vit-topo"><h1>🗺️ Guia ' + esc(REDE) + '</h1><p>Empresas e profissionais da sua região. Chame direto no WhatsApp.</p></header><main>' +
       '<div class="cartao"><div class="filtros-guia"><select id="gu-cid" aria-label="Cidade"><option value="">Todas as cidades</option></select>' +
       '<select id="gu-ramo" aria-label="Ramo"><option value="">Todos os ramos</option></select>' +
       '<input id="gu-busca" type="search" placeholder="🔎 O que você procura? (ex.: eletricista, bolo, pintura)"></div>' +
@@ -288,7 +289,7 @@
     buscar();
   }
 
-  window.AN_PUB = { rpc: rpc, urlPub: urlPub, urlVitrine: urlVitrine, cartaoEmpresa: cartaoEmpresa, novoMapa: novoMapa,
+  window.AN_PUB = { REDE: REDE, rpc: rpc, urlPub: urlPub, urlVitrine: urlVitrine, cartaoEmpresa: cartaoEmpresa, novoMapa: novoMapa,
     REDES: REDES, linksDe: linksDe, htmlConvite: htmlConvite, textoConvite: textoConvite, textoDivulgar: textoDivulgar, htmlDivulgar: htmlDivulgar, ligarDivulgar: ligarDivulgar };
   var alvo = document.getElementById("pub");
   if (!alvo) return;

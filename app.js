@@ -254,7 +254,7 @@
       '<p class="mudo peq" style="margin-top:8px">💾 O que você escreve fica salvo neste aparelho, em cada modelo. <button class="texto peq" id="ar-limpar">🧹 Limpar este modelo</button></p></div>' +
       '<div><div class="previa cartao" style="padding:10px"><canvas id="cv-arte" aria-label="Prévia da arte"></canvas></div>' +
       '<div class="acoes" style="margin-top:0">' + (podeCompartilhar() ? '<button class="prim" id="ar-postar">📤 Postar (Instagram, Facebook, WhatsApp, Telegram...)</button>' : "") +
-      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><button id="ar-vit" title="Mostra esta arte na sua vitrine do Guia Anuncia Aí">📌 Pôr na minha vitrine</button><a id="ar-tg-ver" class="botao oculto" target="_blank" rel="noopener">👁 Ver publicação no Telegram</a><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
+      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><button id="ar-vit" title="Mostra esta arte na sua vitrine do Guia">📌 Pôr na minha vitrine</button><a id="ar-tg-ver" class="botao oculto" target="_blank" rel="noopener">👁 Ver publicação no Telegram</a><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
       '<p class="mudo peq">No Instagram a legenda não vai junto automaticamente: ela já fica copiada, é só colar no post.</p></div></div>';
     $$("[data-modelo]", c).forEach(function (b) {
       b.onclick = function () { guardarAtual(); abrirModelo(b.dataset.modelo); salvarRasc(); verCriar(c); };
@@ -396,7 +396,7 @@
   }
   function verComunidade(c) {
     var link = E.slug ? P.urlVitrine(E.slug) : "";
-    c.innerHTML = '<div class="cartao"><h2>🗺️ Minha vitrine</h2><p class="mudo peq">Uma página da sua empresa no <a href="guia.html" target="_blank" rel="noopener">Guia Anuncia Aí</a>, com logo, contatos, descrição e as artes que você escolher. ' +
+    c.innerHTML = '<div class="cartao"><h2>🗺️ Minha vitrine</h2><p class="mudo peq">Uma página da sua empresa no <a href="guia.html" target="_blank" rel="noopener">Guia ' + esc(P.REDE) + '</a>, com logo, contatos, descrição e as artes que você escolher. ' +
       "Só aparece se você ligar. Nome, ramo, cidade, WhatsApp e Instagram vêm de 🏷️ Minha marca.</p>" +
       '<label class="marca-linha"><input type="checkbox" id="cm-vit"> Mostrar a minha empresa no Guia (página pública)</label>' +
       '<label for="cm-slug">Endereço da página</label><div class="linha"><span class="peq mudo">…/vitrine.html?e=</span><input id="cm-slug" maxlength="60" autocapitalize="none" spellcheck="false" style="flex:1;min-width:160px"></div>' +
