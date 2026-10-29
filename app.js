@@ -456,6 +456,15 @@
       }).catch(function () { A.ocupado(b, false); A.avisar("Sem internet para procurar o endereço.", "erro"); });
     };
     $("#cm-sem").onclick = function () { loc = null; mostrarLoc(); };
+    // colou o link do Google Maps: tira o ponto do link (marcador do lugar) e deixa o link curto do perfil (cid)
+    function lerLinkMaps() {
+      var u = $("#cm-maps").value.trim(); if (!u) return;
+      var mp = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(u) || /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(u), cid = /!1s0x[0-9a-f]+:0x([0-9a-f]+)/i.exec(u);
+      if (cid && window.BigInt) { $("#cm-maps").value = "https://www.google.com/maps?cid=" + BigInt("0x" + cid[1]).toString(); }
+      if (mp && !loc) { loc = { lat: Number(mp[1]), lng: Number(mp[2]) }; mostrarLoc(); A.avisar("📍 Localização tirada do link do Google Maps. Confira no mapa e toque em Salvar.", "ok"); }
+    }
+    $("#cm-maps").addEventListener("change", lerLinkMaps);
+    $("#cm-maps").addEventListener("paste", function () { setTimeout(lerLinkMaps, 0); });
     $("#cm-slug").onblur = function () { this.value = slugDe(this.value) || slugDe(E.nome); };
     $("#cm-salvar").onclick = function () {
       var b = this, liga = $("#cm-vit").checked;
