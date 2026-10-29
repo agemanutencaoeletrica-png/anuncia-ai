@@ -352,6 +352,16 @@ alter table public.empresas add column if not exists endereco    text;
 alter table public.empresas add column if not exists local_exato boolean not null default false;
 alter table public.empresas add column if not exists raio_km     integer;
 alter table public.empresas add column if not exists maps_url    text;      -- link do Perfil da Empresa no Google (avaliações)
+alter table public.empresas add column if not exists redes       jsonb not null default '{}'::jsonb;   -- 🔗 outras redes: {facebook, tiktok, youtube, ...}
+
+-- só as redes conhecidas, com link https:// ou @usuário (nada de javascript: ou texto solto)
+create or replace function public.limpar_redes(j jsonb) returns jsonb
+language sql immutable as $$
+  select coalesce(jsonb_object_agg(k, left(trim(v), 200)), '{}'::jsonb)
+  from jsonb_each_text(case when jsonb_typeof(j) = 'object' then j else '{}'::jsonb end) as t(k, v)
+  where k in ('facebook', 'tiktok', 'youtube', 'telegram', 'kwai', 'threads', 'linkedin', 'x', 'pinterest')
+    and (trim(v) ~* '^https://[^\s]+$' or trim(v) ~ '^@?[A-Za-z0-9._-]{2,60}$');
+$$;
 
 create table if not exists public.vitrine_artes (
   id          uuid primary key default gen_random_uuid(),
@@ -389,7 +399,7 @@ language sql stable security definer set search_path = public as $$
     'descricao', e.descricao, 'whatsapp', e.whatsapp, 'instagram', e.instagram, 'site', e.site,
     'cor1', e.cor1, 'cor2', e.cor2, 'logo', e.logo,
     'lat', public.lat_publica(e), 'lng', public.lng_publica(e), 'exato', e.local_exato and e.lat is not null,
-    'endereco', case when e.local_exato then e.endereco end, 'raio_km', e.raio_km, 'maps_url', e.maps_url,
+    'endereco', case when e.local_exato then e.endereco end, 'raio_km', e.raio_km, 'maps_url', e.maps_url, 'redes', coalesce(e.redes, '{}'::jsonb),
     'arte', (select a.caminho from public.vitrine_artes a where a.empresa_id = e.id order by a.criado_em desc limit 1));
 $$;
 
@@ -421,7 +431,8 @@ begin
     endereco    = case when p ? 'endereco' then nullif(left(trim(coalesce(p ->> 'endereco', '')), 200), '') else endereco end,
     local_exato = coalesce((p ->> 'local_exato')::boolean, local_exato),
     raio_km     = case when not (p ? 'raio_km') then raio_km when (p ->> 'raio_km') ~ '^[0-9]{1,3}$' and (p ->> 'raio_km')::int between 1 and 300 then (p ->> 'raio_km')::int else null end,
-    maps_url    = case when not (p ? 'maps_url') then maps_url when (p ->> 'maps_url') ~* '^https://' then left(trim(p ->> 'maps_url'), 300) else null end
+    maps_url    = case when not (p ? 'maps_url') then maps_url when (p ->> 'maps_url') ~* '^https://' then left(trim(p ->> 'maps_url'), 300) else null end,
+    redes       = case when p ? 'redes' then public.limpar_redes(p -> 'redes') else redes end
   where dono = auth.uid()
   returning * into e;
   if not found then raise exception 'Empresa não encontrada.'; end if;
