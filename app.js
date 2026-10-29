@@ -392,18 +392,70 @@
       '<label for="cm-slug">Endereço da página</label><div class="linha"><span class="peq mudo">…/vitrine.html?e=</span><input id="cm-slug" maxlength="60" autocapitalize="none" spellcheck="false" style="flex:1;min-width:160px"></div>' +
       '<div class="duas"><div><label for="cm-bairro">Bairro onde atende</label><input id="cm-bairro" maxlength="80"></div><div><label>Cidade</label><input disabled value="' + esc(E.cidade || "— preencha em Minha marca") + '"></div></div>' +
       '<label for="cm-desc">Sobre a empresa</label><textarea id="cm-desc" rows="4" maxlength="500" placeholder="O que você faz, onde atende, horário, diferenciais"></textarea>' +
+      '<h3 style="margin-top:16px">📍 No mapa (opcional)</h3><p class="mudo peq" style="margin:2px 0 0">Para aparecer no mapa do Guia e no “📍 Perto de mim” de quem procura.</p>' +
+      '<label for="cm-end">Endereço</label><input id="cm-end" maxlength="200" placeholder="Rua e número (não aparece se você escolher “só a região”)">' +
+      '<div class="linha" style="margin-top:6px"><button class="peq" id="cm-gps">📍 Usar minha localização</button><button class="peq" id="cm-achar">🔎 Achar pelo endereço</button><button class="peq oculto" id="cm-sem">Tirar do mapa</button></div>' +
+      '<div id="cm-mapa" class="mapa oculto" style="margin-top:8px"></div><p class="peq mudo" id="cm-pos" style="margin:4px 0 0"></p>' +
+      '<label class="marca-linha" style="font-weight:400"><input type="radio" name="cm-exato" value="0"> Mostrar só a região, uns 1 km (atendo em casa ou no local do cliente)</label>' +
+      '<label class="marca-linha" style="font-weight:400"><input type="radio" name="cm-exato" value="1"> Mostrar o endereço exato (tenho loja ou escritório)</label>' +
+      '<label for="cm-raio">Atende até</label><select id="cm-raio"><option value="">— não informar —</option>' + [5, 10, 20, 30, 50, 100].map(function (k) { return '<option value="' + k + '">' + k + " km</option>"; }).join("") + "</select>" +
+      '<label for="cm-maps">Link do seu perfil no Google Maps (avaliações)</label><input id="cm-maps" maxlength="300" inputmode="url" placeholder="https://maps.app.goo.gl/...">' +
+      '<details class="peq" style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">Ainda não aparece no Google Maps? Veja como colocar (grátis)</summary><ol>' +
+      '<li>Abra <a href="https://business.google.com/create" target="_blank" rel="noopener">business.google.com/create</a> e entre com a conta Google da empresa.</li>' +
+      "<li>Escreva o nome da empresa e a categoria (ex.: Eletricista, Pintor).</li>" +
+      "<li>Se atende na casa do cliente, diga que <b>não</b> tem local para receber clientes e escolha as cidades e bairros que atende: o seu endereço não aparece.</li>" +
+      "<li>Coloque o WhatsApp e, no site, o link da sua vitrine do Anuncia Aí.</li>" +
+      "<li>Faça a verificação que o Google pedir (vídeo, ligação ou código).</li>" +
+      "<li>Pronto no Google: abra o seu perfil no Google Maps, toque em <b>Compartilhar</b>, copie o link e cole aqui em cima. Na sua vitrine aparece o botão ⭐ Avaliações no Google.</li></ol></details>" +
       '<div id="cm-msg"></div><div class="acoes"><button class="prim" id="cm-salvar">Salvar</button>' +
       (E.vitrine && link ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(link) + '">👁 Ver minha vitrine</a><button id="cm-copiar">📋 Copiar link</button>' : "") + "</div>" +
       (E.vitrine ? '<h3 style="margin-top:16px">Artes na vitrine</h3><p class="mudo peq">Em 🎨 Criar arte, toque em <b>📌 Pôr na minha vitrine</b>. Ficam as 12 mais novas.</p><div id="cm-artes" class="artes-grade"><span class="mudo peq">Carregando...</span></div>' : "") + "</div>" +
       '<div class="cartao" id="cm-rede"><h2>🤝 Minha rede</h2>' + (E.vitrine ? '<div class="mudo peq">Carregando...</div>' :
         '<p class="mudo peq">Ligue a sua vitrine para entrar na rede: você recomenda até 6 parceiros que completam o seu serviço (ex.: o eletricista indica o pintor), eles aparecem na sua vitrine e você divulga as artes deles. Eles podem fazer o mesmo por você.</p>') + "</div>";
     $("#cm-vit").checked = !!E.vitrine; $("#cm-slug").value = E.slug || slugDe(E.nome); $("#cm-bairro").value = E.bairro || ""; $("#cm-desc").value = E.descricao || "";
+    $("#cm-end").value = E.endereco || ""; $("#cm-raio").value = E.raio_km ? String(E.raio_km) : ""; $("#cm-maps").value = E.maps_url || "";
+    $$('input[name="cm-exato"]', c).forEach(function (r) { r.checked = r.value === (E.local_exato ? "1" : "0"); });
+    // 📍 ponto no mapa: GPS do aparelho ou endereço; dá para arrastar o marcador para acertar
+    var loc = E.lat !== null && E.lat !== undefined ? { lat: E.lat, lng: E.lng } : null, mapa = null, marca = null;
+    function mostrarLoc() {
+      $("#cm-sem").classList.toggle("oculto", !loc);
+      $("#cm-pos").textContent = loc ? "📍 Ponto marcado. Se não estiver certo, arraste o marcador no mapa." : "Sem ponto no mapa.";
+      if (!loc) { $("#cm-mapa").classList.add("oculto"); return; }
+      $("#cm-mapa").classList.remove("oculto");
+      (mapa ? Promise.resolve(mapa) : P.novoMapa($("#cm-mapa"), loc.lat, loc.lng, 16).then(function (x) { mapa = x; return x; })).then(function (x) {
+        if (!marca) { marca = x.L.marker([loc.lat, loc.lng], { draggable: true }).addTo(x.m); marca.on("dragend", function () { var p = marca.getLatLng(); loc = { lat: p.lat, lng: p.lng }; }); }
+        else marca.setLatLng([loc.lat, loc.lng]);
+        x.m.setView([loc.lat, loc.lng], 16); setTimeout(function () { x.m.invalidateSize(); }, 50);
+      }).catch(function () { $("#cm-pos").textContent = "📍 Ponto marcado (o mapa não carregou agora)."; });
+    }
+    mostrarLoc();
+    $("#cm-gps").onclick = function () {
+      var b = this; if (!navigator.geolocation) { A.avisar("Este aparelho não informa a localização.", "erro"); return; }
+      A.ocupado(b, true, "Localizando...");
+      navigator.geolocation.getCurrentPosition(function (p) { A.ocupado(b, false); loc = { lat: p.coords.latitude, lng: p.coords.longitude }; mostrarLoc(); },
+        function () { A.ocupado(b, false); A.avisar("Não consegui a localização. Libere a localização para este site, ou use 🔎 Achar pelo endereço.", "erro"); }, { enableHighAccuracy: true, timeout: 20000 });
+    };
+    $("#cm-achar").onclick = function () {
+      var b = this, qy = [$("#cm-end").value.trim(), $("#cm-bairro").value.trim(), E.cidade].filter(Boolean).join(", ");
+      if (!qy) { A.avisar("Escreva o endereço ou o bairro.", "erro"); return; }
+      A.ocupado(b, true, "Procurando...");
+      fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&accept-language=pt-BR&q=" + encodeURIComponent(qy)).then(function (r) { return r.json(); }).then(function (ls) {
+        A.ocupado(b, false);
+        if (!ls || !ls.length) { A.avisar("Não achei esse endereço. Tente só a rua e o bairro, ou use 📍 Usar minha localização.", "erro"); return; }
+        loc = { lat: Number(ls[0].lat), lng: Number(ls[0].lon) }; mostrarLoc();
+      }).catch(function () { A.ocupado(b, false); A.avisar("Sem internet para procurar o endereço.", "erro"); });
+    };
+    $("#cm-sem").onclick = function () { loc = null; mostrarLoc(); };
     $("#cm-slug").onblur = function () { this.value = slugDe(this.value) || slugDe(E.nome); };
     $("#cm-salvar").onclick = function () {
       var b = this, liga = $("#cm-vit").checked;
       if (liga && !E.cidade) { $("#cm-msg").innerHTML = '<div class="aviso erro">Preencha a cidade em <a href="#marca">🏷️ Minha marca</a> para aparecer no Guia.</div>'; return; }
       A.ocupado(b, true, "Salvando...");
-      q(sb.rpc("salvar_vitrine", { p: { vitrine: liga, slug: slugDe($("#cm-slug").value), bairro: $("#cm-bairro").value, descricao: $("#cm-desc").value } })).then(function (n) {
+      var exato = ($('input[name="cm-exato"]:checked', c) || {}).value === "1", mp = $("#cm-maps").value.trim();
+      if (mp && !/^https:\/\//i.test(mp)) { A.ocupado(b, false); $("#cm-msg").innerHTML = '<div class="aviso erro">O link do Google Maps começa com https:// (copie pelo botão Compartilhar do seu perfil).</div>'; return; }
+      q(sb.rpc("salvar_vitrine", { p: { vitrine: liga, slug: slugDe($("#cm-slug").value), bairro: $("#cm-bairro").value, descricao: $("#cm-desc").value,
+        lat: loc ? Math.round(loc.lat * 1e6) / 1e6 : null, lng: loc ? Math.round(loc.lng * 1e6) / 1e6 : null, endereco: $("#cm-end").value, local_exato: exato,
+        raio_km: $("#cm-raio").value || null, maps_url: mp || null } })).then(function (n) {
         E = Array.isArray(n) ? n[0] : n; A.avisar(liga ? "Vitrine ligada ✅" : "Salvo (vitrine desligada)", "ok"); verComunidade(c);
       }).catch(function (e) { A.ocupado(b, false); $("#cm-msg").innerHTML = '<div class="aviso erro">' + esc(erroComunidade(e)) + "</div>"; });
     };

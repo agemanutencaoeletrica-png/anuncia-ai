@@ -110,3 +110,5 @@ tr.clic { cursor: pointer; } tr.clic:hover { background: var(--sup2); }
 .emp-txt > a.forte { color: var(--texto); text-decoration: none; font-size: 17px; }
 .filtros-guia { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 8px; }
 @media (max-width: 640px) { .filtros-guia { grid-template-columns: 1fr; } }
+.mapa { height: 240px; border-radius: 12px; overflow: hidden; border: 1px solid var(--borda); z-index: 0; }
+.mapa.grande { height: 62vh; min-height: 360px; margin-bottom: 14px; }

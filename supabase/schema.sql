@@ -345,6 +345,13 @@ alter table public.empresas add column if not exists slug      text;
 alter table public.empresas add column if not exists bairro    text;
 alter table public.empresas add column if not exists descricao text;
 create unique index if not exists empresas_slug_idx on public.empresas (slug) where slug is not null;
+-- 📍 localização no mapa (opcional): quem atende em casa ou no cliente mostra só a região (~1 km), nunca o ponto exato
+alter table public.empresas add column if not exists lat         double precision;
+alter table public.empresas add column if not exists lng         double precision;
+alter table public.empresas add column if not exists endereco    text;
+alter table public.empresas add column if not exists local_exato boolean not null default false;
+alter table public.empresas add column if not exists raio_km     integer;
+alter table public.empresas add column if not exists maps_url    text;      -- link do Perfil da Empresa no Google (avaliações)
 
 create table if not exists public.vitrine_artes (
   id          uuid primary key default gen_random_uuid(),
@@ -365,11 +372,24 @@ create table if not exists public.parceiros (
 create index if not exists parceiros_parc_idx on public.parceiros (parceiro_id);
 
 -- cartão público de uma empresa (o que qualquer pessoa pode ver)
+-- ponto que o público vê: o exato (loja/escritório) ou arredondado (~1 km) para quem não quer mostrar onde fica
+create or replace function public.lat_publica(e public.empresas) returns double precision
+language sql immutable as $$ select case when e.lat is null then null when e.local_exato then e.lat else round(e.lat::numeric, 2)::double precision end; $$;
+create or replace function public.lng_publica(e public.empresas) returns double precision
+language sql immutable as $$ select case when e.lng is null then null when e.local_exato then e.lng else round(e.lng::numeric, 2)::double precision end; $$;
+-- distância em km (fórmula de haversine)
+create or replace function public.distancia_km(lat1 double precision, lng1 double precision, lat2 double precision, lng2 double precision) returns double precision
+language sql immutable as $$
+  select 6371 * 2 * asin(sqrt(power(sin(radians(lat2 - lat1) / 2), 2) + cos(radians(lat1)) * cos(radians(lat2)) * power(sin(radians(lng2 - lng1) / 2), 2)));
+$$;
+
 create or replace function public.cartao_publico(e public.empresas) returns jsonb
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object('nome', e.nome, 'slug', e.slug, 'ramo', e.ramo, 'cidade', e.cidade, 'bairro', e.bairro,
     'descricao', e.descricao, 'whatsapp', e.whatsapp, 'instagram', e.instagram, 'site', e.site,
     'cor1', e.cor1, 'cor2', e.cor2, 'logo', e.logo,
+    'lat', public.lat_publica(e), 'lng', public.lng_publica(e), 'exato', e.local_exato and e.lat is not null,
+    'endereco', case when e.local_exato then e.endereco end, 'raio_km', e.raio_km, 'maps_url', e.maps_url,
     'arte', (select a.caminho from public.vitrine_artes a where a.empresa_id = e.id order by a.criado_em desc limit 1));
 $$;
 
@@ -394,7 +414,14 @@ begin
     vitrine   = coalesce((p ->> 'vitrine')::boolean, vitrine),
     slug      = v_slug,
     bairro    = nullif(left(trim(coalesce(p ->> 'bairro', '')), 80), ''),
-    descricao = nullif(left(trim(coalesce(p ->> 'descricao', '')), 500), '')
+    descricao = nullif(left(trim(coalesce(p ->> 'descricao', '')), 500), ''),
+    -- localização: só muda se vier no pedido; ponto fora do mapa é ignorado
+    lat         = case when not (p ? 'lat') then lat when (p ->> 'lat') ~ '^-?[0-9]+(\.[0-9]+)?$' and abs((p ->> 'lat')::double precision) <= 90 then (p ->> 'lat')::double precision else null end,
+    lng         = case when not (p ? 'lng') then lng when (p ->> 'lng') ~ '^-?[0-9]+(\.[0-9]+)?$' and abs((p ->> 'lng')::double precision) <= 180 then (p ->> 'lng')::double precision else null end,
+    endereco    = case when p ? 'endereco' then nullif(left(trim(coalesce(p ->> 'endereco', '')), 200), '') else endereco end,
+    local_exato = coalesce((p ->> 'local_exato')::boolean, local_exato),
+    raio_km     = case when not (p ? 'raio_km') then raio_km when (p ->> 'raio_km') ~ '^[0-9]{1,3}$' and (p ->> 'raio_km')::int between 1 and 300 then (p ->> 'raio_km')::int else null end,
+    maps_url    = case when not (p ? 'maps_url') then maps_url when (p ->> 'maps_url') ~* '^https://' then left(trim(p ->> 'maps_url'), 300) else null end
   where dono = auth.uid()
   returning * into e;
   if not found then raise exception 'Empresa não encontrada.'; end if;
@@ -456,6 +483,20 @@ language sql stable security definer set search_path = public as $$
       and (coalesce(p_busca, '') = '' or lower(concat_ws(' ', e.nome, e.ramo, e.bairro, e.descricao)) like '%' || lower(trim(p_busca)) || '%')
     limit 300
   ) t;
+$$;
+
+-- 📍 perto de mim: vitrines com localização até p_km do ponto, da mais perto para a mais longe
+-- (a distância usa o ponto público, então não revela o endereço de quem mostra só a região)
+create or replace function public.guia_perto(p_lat double precision, p_lng double precision, p_km double precision default 30,
+                                             p_ramo text default null, p_busca text default null) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(c || jsonb_build_object('distancia_km', round(d::numeric, 1)) order by d), '[]'::jsonb) from (select * from (
+    select public.cartao_publico(e) as c, public.distancia_km(p_lat, p_lng, public.lat_publica(e), public.lng_publica(e)) as d
+    from public.empresas e
+    where public.na_vitrine(e) and e.lat is not null and e.lng is not null
+      and (coalesce(p_ramo, '') = '' or lower(trim(e.ramo)) = lower(trim(p_ramo)))
+      and (coalesce(p_busca, '') = '' or lower(concat_ws(' ', e.nome, e.ramo, e.bairro, e.descricao)) like '%' || lower(trim(p_busca)) || '%')
+  ) t0 where d <= least(greatest(coalesce(p_km, 30), 1), 300) order by d limit 200) t
 $$;
 
 -- cidades e ramos que têm vitrine (para os filtros do guia)
@@ -539,6 +580,7 @@ grant execute on function public.recomendar(text, boolean) to authenticated;
 grant execute on function public.vitrine_publica(text) to anon, authenticated;
 grant execute on function public.guia(text, text, text) to anon, authenticated;
 grant execute on function public.guia_filtros() to anon, authenticated;
+grant execute on function public.guia_perto(double precision, double precision, double precision, text, text) to anon, authenticated;
 
 -- Pasta pública "vitrine" (as artes que a empresa escolheu mostrar). Cada empresa só mexe na própria pasta.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
