@@ -529,6 +529,8 @@
         (me.length ? '<h3 style="margin-top:14px">Recomendam você (' + me.length + ")</h3>" + me.map(function (x) {
           return mini(x, x.ja_recomendo ? '<span class="selo bom">vocês se recomendam</span>' : '<button class="peq prim" data-rec="' + esc(x.slug) + '">🤝 Recomendar de volta</button>');
         }).join("") : "") +
+        '<h3 style="margin-top:14px">✉️ Convide uma empresa parceira</h3><p class="mudo peq" style="margin:2px 0 6px">Conhece alguém de confiança que completa o seu serviço? Mande o convite: quando ela entrar, vocês se recomendam.</p>' +
+        '<textarea id="rd-convite" rows="9"></textarea><div class="acoes"><a class="botao zap" id="rd-conv-zap" target="_blank" rel="noopener">💬 Convidar pelo WhatsApp</a><button id="rd-conv-copiar">📋 Copiar convite</button></div>' +
         '<h3 style="margin-top:14px">Procurar no Guia</h3><div class="linha"><input id="rd-busca" type="search" placeholder="Nome, ramo ou bairro (ex.: pintor, gesso, Palmeiras)" style="flex:1"><button class="peq" id="rd-ir">🔎 Procurar</button></div><div id="rd-res"></div>' +
         (sug.length ? '<h3 style="margin-top:14px">Sugestões em ' + esc(E.cidade || "sua cidade") + "</h3>" + sug.map(function (x) { return mini(x, '<button class="peq" data-rec="' + esc(x.slug) + '">➕ Recomendar</button>'); }).join("") : "") +
         '<p class="peq" style="margin-top:12px"><a target="_blank" rel="noopener" href="guia.html' + (E.cidade ? "?cidade=" + encodeURIComponent(E.cidade) : "") + '">🗺️ Abrir o Guia' + (E.cidade ? " de " + esc(E.cidade) : "") + "</a></p>";
@@ -538,6 +540,9 @@
         });
       }
       ligar(el);
+      $("#rd-convite", el).value = P.textoConvite(E);
+      $("#rd-conv-zap", el).onclick = function () { this.href = "https://wa.me/?text=" + encodeURIComponent($("#rd-convite", el).value); };
+      $("#rd-conv-copiar", el).onclick = function () { A.copiar($("#rd-convite", el).value, "Convite copiado"); };
       $$("[data-tira]", el).forEach(function (b) {
         b.onclick = function () { if (!window.confirm("Tirar este parceiro da sua vitrine?")) return; q(sb.rpc("recomendar", { p_slug: b.dataset.tira, p_sim: false })).then(function () { verRede(el, c); }).catch(function (e) { A.avisar(erroComunidade(e), "erro"); }); };
       });

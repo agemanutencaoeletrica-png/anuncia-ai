@@ -44,7 +44,11 @@
     return temLocal(c) && c.exato ? "https://www.google.com/maps/search/?api=1&query=" + c.lat + "," + c.lng
       : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([c.nome, c.endereco, c.bairro, c.cidade].filter(Boolean).join(", "));
   }
-  function linkRota(c) { return "https://www.google.com/maps/dir/?api=1&destination=" + (c.exato ? c.lat + "," + c.lng : encodeURIComponent([c.endereco || c.bairro, c.cidade].filter(Boolean).join(", "))); }
+  // rota no Google Maps: até o ponto exato; quem mostra só a região leva ao bairro/cidade (ou ao ponto aproximado)
+  function linkRota(c) {
+    var reg = [c.bairro, c.cidade].filter(Boolean).join(", ");
+    return "https://www.google.com/maps/dir/?api=1&destination=" + (c.exato && temLocal(c) ? c.lat + "," + c.lng : reg ? encodeURIComponent(reg) : temLocal(c) ? c.lat + "," + c.lng : encodeURIComponent(c.nome));
+  }
   function km(v) { return Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " km"; }
   // 🔗 redes sociais: aceita o link completo ou só o @usuário
   var REDES = [["facebook", "Facebook", "📘"], ["tiktok", "TikTok", "🎵"], ["youtube", "YouTube", "▶️"], ["telegram", "Telegram", "✈️"], ["kwai", "Kwai", "🎬"],
@@ -109,6 +113,25 @@
       }).catch(function (e) { A.ocupado(b, false); A.avisar(A.msgErro(e), "erro"); });
     };
   }
+  // 🏛️ convite para a comunidade (vitrine, guia e site)
+  function htmlConvite() {
+    return '<section class="convite"><div class="convite-sel">Comunidade Anuncia Aí</div><h2>Venha fazer parte da nossa rede</h2>' +
+      "<p>Reunimos empresas que acreditam no trabalho bem feito e na força da boa indicação. Aqui, cada negócio tem a sua vitrine, é encontrado por quem está perto " +
+      "e caminha ao lado de parceiros que se recomendam.</p><ul>" +
+      "<li><b>Uma vitrine elegante</b>, com seus links, mapa, avaliações e novidades</li>" +
+      "<li><b>Parceiros que indicam você</b>, e você a eles, entre quem se completa</li>" +
+      "<li><b>Presença no Guia da sua cidade</b> e no “Perto de mim” de quem procura</li>" +
+      "<li><b>Artes profissionais</b> para divulgar nas redes em um minuto</li></ul>" +
+      '<div class="acoes"><a class="botao dest" href="' + esc(new URL("app.html", location.href).href) + '">Quero fazer parte · 7 dias grátis</a>' +
+      '<a class="botao" href="' + esc(new URL("index.html", location.href).href) + '">Conhecer o Anuncia Aí</a></div></section>';
+  }
+  // convite que uma empresa manda para um parceiro (WhatsApp)
+  function textoConvite(c) {
+    return "Olá! Tudo bem?\n\nAqui é da *" + c.nome + "*. Fazemos parte da *Comunidade Anuncia Aí*, uma rede de empresas da região que se apoiam e se recomendam, e lembramos de você pelo trabalho sério que faz.\n\n" +
+      "Lá cada empresa tem uma vitrine profissional, aparece no Guia da cidade e no “Perto de mim” de quem procura, e cria artes para as redes em um minuto.\n\n" +
+      "Seria uma alegria ter a sua empresa como parceira e recomendar o seu trabalho na nossa página.\n\n" +
+      "✨ Conheça e teste 7 dias grátis: " + new URL("index.html", location.href).href + (c.slug ? "\n🔗 Nossa vitrine: " + urlVitrine(c.slug) : "");
+  }
   function msgZap(c) { return "Olá, " + c.nome + "! Vi vocês no Guia Anuncia Aí e gostaria de um orçamento."; }
 
   // cartão de empresa (guia e "Recomendamos")
@@ -146,19 +169,23 @@
         }).join("") + "</div></div>" : "") +
         (temLocal(v) || v.endereco ? '<div class="cartao"><h2 style="margin-bottom:6px">📍 ' + (v.exato ? "Onde estamos" : "Região de atendimento") + "</h2>" +
           '<p class="peq mudo" style="margin:0 0 8px">' + esc(v.exato ? [v.endereco, v.bairro, v.cidade].filter(Boolean).join(" · ") : "Atende " + [v.bairro, v.cidade].filter(Boolean).join(" · ") + (v.raio_km ? " e até " + v.raio_km + " km" : "")) + "</p>" +
-          (temLocal(v) ? '<div id="vt-mapa" class="mapa"></div>' : "") +
+          (temLocal(v) ? '<div id="vt-mapa" class="mapa clicavel" title="Toque para abrir a rota no Google Maps"></div><p class="peq mudo" style="margin:4px 0 0">👆 Toque no mapa para abrir a rota até ' + (v.exato ? "o endereço" : "a região") + " no Google Maps.</p>" : "") +
           '<div class="acoes"><a class="botao" target="_blank" rel="noopener" href="' + esc(linkGoogle(v)) + '">🗺️ Ver no Google Maps</a>' +
-          (v.exato ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(linkRota(v)) + '">🧭 Como chegar</a>' : "") + "</div></div>" : "") +
+          '<a class="botao" target="_blank" rel="noopener" href="' + esc(linkRota(v)) + '">🧭 Como chegar' + (v.exato ? "" : " (região)") + "</a></div></div>" : "") +
         ((v.artes || []).length ? '<h2 style="margin:6px 0 10px">Novidades e promoções</h2><div class="artes-grade">' + v.artes.map(function (a, n) {
           return '<button class="arte-mini" data-arte="' + n + '"><img loading="lazy" alt="' + esc(String(a.legenda || "Arte de " + v.nome).slice(0, 120)) + '" src="' + esc(urlPub("vitrine", a.caminho)) + '"></button>';
         }).join("") + "</div>" : "") +
         ((v.parceiros || []).length ? '<h2 style="margin:18px 0 10px">🤝 Recomendamos</h2><div class="emp-grade">' + v.parceiros.map(cartaoEmpresa).join("") + "</div>" : "") +
         '<div class="cartao" style="margin-top:14px"><h2>📤 Divulgue ' + esc(v.nome) + '</h2><p class="peq mudo" style="margin:4px 0 0">Mande para os seus grupos e contatos: vai a mensagem com todos os links.</p>' + htmlDivulgar("vd") + "</div>" +
+        htmlConvite() +
         '<p class="mudo peq" style="text-align:center;margin-top:22px"><a href="guia.html' + (v.cidade ? "?cidade=" + encodeURIComponent(v.cidade) : "") + '">🗺️ Mais empresas' + (v.cidade ? " em " + esc(v.cidade) : "") + "</a> · " +
         '<a href="index.html">Crie a vitrine da sua empresa no Anuncia Aí</a></p></main>';
       if ($("#vt-mapa")) novoMapa($("#vt-mapa"), v.lat, v.lng, v.exato ? 16 : 13).then(function (x) {
-        if (v.exato) x.L.marker([v.lat, v.lng]).addTo(x.m).bindPopup(esc(v.nome));
-        else x.L.circle([v.lat, v.lng], { radius: 1200, color: c1, fillOpacity: .15 }).addTo(x.m);
+        // tocar no mapa (ou no marcador) abre a rota no Google Maps
+        var rota = function () { window.open(linkRota(v), "_blank", "noopener"); };
+        if (v.exato) x.L.marker([v.lat, v.lng]).addTo(x.m).on("click", rota);
+        else x.L.circle([v.lat, v.lng], { radius: 1200, color: c1, fillOpacity: .15 }).addTo(x.m).on("click", rota);
+        x.m.on("click", rota);
       }).catch(function () { $("#vt-mapa").remove(); });
       // dados para o Google entender a empresa (negócio local)
       var ld = { "@context": "https://schema.org", "@type": "LocalBusiness", name: v.nome, description: v.descricao || undefined, url: location.href,
@@ -194,7 +221,7 @@
       '<span style="flex:1"></span><button class="peq prim" id="gu-ver-lista">📋 Lista</button><button class="peq" id="gu-ver-mapa">🗺️ Mapa</button></div></div>' +
       '<div id="gu-mapa" class="mapa grande oculto"></div>' +
       '<div id="gu-res"><div class="vazio"><span class="carregando"></span> Carregando...</div></div>' +
-      '<p class="mudo peq" style="text-align:center;margin-top:22px">Tem uma empresa? <a href="index.html">Apareça no guia com o Anuncia Aí</a></p></main>';
+      htmlConvite() + "</main>";
     $("#gu-busca").value = F.busca;
     rpc("guia_filtros").then(function (f) {
       $("#gu-cid").innerHTML += (f.cidades || []).map(function (c) { return '<option' + (c.toLowerCase() === F.cidade.toLowerCase() ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("");
@@ -211,7 +238,8 @@
           var pts = [];
           com.forEach(function (c) {
             var pop = "<b>" + esc(c.nome) + "</b><br>" + esc(local(c)) + (c.distancia_km !== undefined ? "<br>📍 a " + esc(km(c.distancia_km)) : "") +
-              '<br><a href="' + esc(urlVitrine(c.slug)) + '">Ver vitrine</a>' + (c.whatsapp ? ' · <a target="_blank" rel="noopener" href="' + esc(A.linkZap(c.whatsapp, msgZap(c))) + '">WhatsApp</a>' : "");
+              '<br><a target="_blank" rel="noopener" href="' + esc(linkRota(c)) + '">🧭 Como chegar</a> · <a href="' + esc(urlVitrine(c.slug)) + '">Ver vitrine</a>' +
+              (c.whatsapp ? ' · <a target="_blank" rel="noopener" href="' + esc(A.linkZap(c.whatsapp, msgZap(c))) + '">WhatsApp</a>' : "");
             (c.exato ? x.L.marker([c.lat, c.lng]) : x.L.circleMarker([c.lat, c.lng], { radius: 10, color: cor(c.cor1, "#7c3aed"), fillOpacity: .5 })).bindPopup(pop).addTo(camada);
             pts.push([c.lat, c.lng]);
           });
@@ -257,7 +285,7 @@
   }
 
   window.AN_PUB = { rpc: rpc, urlPub: urlPub, urlVitrine: urlVitrine, cartaoEmpresa: cartaoEmpresa, novoMapa: novoMapa,
-    REDES: REDES, linksDe: linksDe, textoDivulgar: textoDivulgar, htmlDivulgar: htmlDivulgar, ligarDivulgar: ligarDivulgar };
+    REDES: REDES, linksDe: linksDe, htmlConvite: htmlConvite, textoConvite: textoConvite, textoDivulgar: textoDivulgar, htmlDivulgar: htmlDivulgar, ligarDivulgar: ligarDivulgar };
   var alvo = document.getElementById("pub");
   if (!alvo) return;
   if (!A.configurado()) { A.telaSemConfig(alvo); return; }
