@@ -3,7 +3,7 @@
   "use strict";
   var A = window.AN, R = window.AN_ARTES, esc = A.esc, $ = A.$, $$ = A.$$;
   var app = $("#app"), sb = null, E = null, PLANOS = [], logoImg = null, logoDe = null;
-  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"]];
+  var ABAS = [["criar", "🎨 Criar arte"], ["marca", "🏷️ Minha marca"], ["comunidade", "🤝 Comunidade"], ["assinatura", "💳 Assinatura"], ["sugestoes", "💡 Sugestões"]];
   var arte = { modelo: "promocao", formato: "post", campos: {}, fotos: [], fotosURL: [], legenda: "", legendaEditada: false, por: {}, emp: null };
   var vigiaPix = null;
 
@@ -149,7 +149,7 @@
     $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + "</a>"; }).join("");
     faixa();
     var c = $("#conteudo");
-    ({ criar: verCriar, marca: verMarca, assinatura: verAssinatura, sugestoes: verSugestoes })[aba](c);
+    ({ criar: verCriar, marca: verMarca, comunidade: verComunidade, assinatura: verAssinatura, sugestoes: verSugestoes })[aba](c);
   }
 
   // ---------- criar arte ----------
@@ -249,7 +249,7 @@
       '<p class="mudo peq" style="margin-top:8px">💾 O que você escreve fica salvo neste aparelho, em cada modelo. <button class="texto peq" id="ar-limpar">🧹 Limpar este modelo</button></p></div>' +
       '<div><div class="previa cartao" style="padding:10px"><canvas id="cv-arte" aria-label="Prévia da arte"></canvas></div>' +
       '<div class="acoes" style="margin-top:0">' + (podeCompartilhar() ? '<button class="prim" id="ar-postar">📤 Postar (Instagram, Facebook, WhatsApp, Telegram...)</button>' : "") +
-      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><a id="ar-tg-ver" class="botao oculto" target="_blank" rel="noopener">👁 Ver publicação no Telegram</a><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
+      '<button id="ar-baixar"' + (podeCompartilhar() ? "" : ' class="prim"') + '>⬇ Baixar imagem</button><button id="ar-copiar">📋 Copiar legenda</button><button id="ar-vit" title="Mostra esta arte na sua vitrine do Guia Anuncia Aí">📌 Pôr na minha vitrine</button><a id="ar-tg-ver" class="botao oculto" target="_blank" rel="noopener">👁 Ver publicação no Telegram</a><button id="ar-tg" class="oculto">📢 Publicar no Telegram</button></div>' +
       '<p class="mudo peq">No Instagram a legenda não vai junto automaticamente: ela já fica copiada, é só colar no post.</p></div></div>';
     $$("[data-modelo]", c).forEach(function (b) {
       b.onclick = function () { guardarAtual(); abrirModelo(b.dataset.modelo); salvarRasc(); verCriar(c); };
@@ -290,6 +290,20 @@
     function nome() { return "anuncia-ai-" + arte.modelo + "-" + Date.now() + ".jpg"; }
     $("#ar-baixar", c).onclick = function () { blob().then(function (b) { A.baixar(b, nome()); A.copiar($("#ar-leg").value, "Imagem baixada e legenda copiada."); }); };
     $("#ar-copiar", c).onclick = function () { A.copiar($("#ar-leg").value, "Legenda copiada."); };
+    $("#ar-vit", c).onclick = function () {
+      if (!E.vitrine) { if (window.confirm("A sua vitrine está desligada. Abrir 🤝 Comunidade para ligar?")) location.hash = "#comunidade"; return; }
+      var b = this; A.ocupado(b, true, "Enviando...");
+      blob().then(function (bl) {
+        var cam = E.id + "/arte-" + Date.now() + ".jpg";
+        return q(sb.storage.from("vitrine").upload(cam, bl, { contentType: "image/jpeg", upsert: false })).then(function () {
+          return q(sb.rpc("por_na_vitrine", { p_caminho: cam, p_legenda: $("#ar-leg").value }));
+        });
+      }).then(function (sairam) {
+        // a vitrine guarda as 12 mais novas: apaga os arquivos das que saíram
+        if (sairam && sairam.length) sb.storage.from("vitrine").remove(sairam).catch(function () {});
+        A.ocupado(b, false); A.avisar("📌 Arte na sua vitrine", "ok");
+      }).catch(function (e) { A.ocupado(b, false); A.avisar(erroComunidade(e), "erro"); });
+    };
     statusTelegram().then(function (st) {
       var b = $("#ar-tg", c); if (!b) return;
       if (st.configurado) { b.classList.remove("oculto"); b.textContent = "📢 Publicar no Telegram (" + st.canal + ")"; }
@@ -361,6 +375,111 @@
       };
       im.src = URL.createObjectURL(f);
     };
+  }
+
+  // ---------- 🤝 comunidade: vitrine pública (opcional), guia e rede de parceiros ----------
+  var P = window.AN_PUB;
+  function slugDe(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, ""); }
+  function erroComunidade(e) {
+    var m = A.msgErro(e);
+    return /salvar_vitrine|minha_rede|por_na_vitrine|recomendar|vitrine_artes|Bucket not found|schema cache|does not exist/i.test(m) ? "A Comunidade ainda não foi ativada no servidor (falta rodar o supabase/comunidade.sql)." : m;
+  }
+  function verComunidade(c) {
+    var link = E.slug ? P.urlVitrine(E.slug) : "";
+    c.innerHTML = '<div class="cartao"><h2>🗺️ Minha vitrine</h2><p class="mudo peq">Uma página da sua empresa no <a href="guia.html" target="_blank" rel="noopener">Guia Anuncia Aí</a>, com logo, contatos, descrição e as artes que você escolher. ' +
+      "Só aparece se você ligar. Nome, ramo, cidade, WhatsApp e Instagram vêm de 🏷️ Minha marca.</p>" +
+      '<label class="marca-linha"><input type="checkbox" id="cm-vit"> Mostrar a minha empresa no Guia (página pública)</label>' +
+      '<label for="cm-slug">Endereço da página</label><div class="linha"><span class="peq mudo">…/vitrine.html?e=</span><input id="cm-slug" maxlength="60" autocapitalize="none" spellcheck="false" style="flex:1;min-width:160px"></div>' +
+      '<div class="duas"><div><label for="cm-bairro">Bairro onde atende</label><input id="cm-bairro" maxlength="80"></div><div><label>Cidade</label><input disabled value="' + esc(E.cidade || "— preencha em Minha marca") + '"></div></div>' +
+      '<label for="cm-desc">Sobre a empresa</label><textarea id="cm-desc" rows="4" maxlength="500" placeholder="O que você faz, onde atende, horário, diferenciais"></textarea>' +
+      '<div id="cm-msg"></div><div class="acoes"><button class="prim" id="cm-salvar">Salvar</button>' +
+      (E.vitrine && link ? '<a class="botao" target="_blank" rel="noopener" href="' + esc(link) + '">👁 Ver minha vitrine</a><button id="cm-copiar">📋 Copiar link</button>' : "") + "</div>" +
+      (E.vitrine ? '<h3 style="margin-top:16px">Artes na vitrine</h3><p class="mudo peq">Em 🎨 Criar arte, toque em <b>📌 Pôr na minha vitrine</b>. Ficam as 12 mais novas.</p><div id="cm-artes" class="artes-grade"><span class="mudo peq">Carregando...</span></div>' : "") + "</div>" +
+      '<div class="cartao" id="cm-rede"><h2>🤝 Minha rede</h2>' + (E.vitrine ? '<div class="mudo peq">Carregando...</div>' :
+        '<p class="mudo peq">Ligue a sua vitrine para entrar na rede: você recomenda até 6 parceiros que completam o seu serviço (ex.: o eletricista indica o pintor), eles aparecem na sua vitrine e você divulga as artes deles. Eles podem fazer o mesmo por você.</p>') + "</div>";
+    $("#cm-vit").checked = !!E.vitrine; $("#cm-slug").value = E.slug || slugDe(E.nome); $("#cm-bairro").value = E.bairro || ""; $("#cm-desc").value = E.descricao || "";
+    $("#cm-slug").onblur = function () { this.value = slugDe(this.value) || slugDe(E.nome); };
+    $("#cm-salvar").onclick = function () {
+      var b = this, liga = $("#cm-vit").checked;
+      if (liga && !E.cidade) { $("#cm-msg").innerHTML = '<div class="aviso erro">Preencha a cidade em <a href="#marca">🏷️ Minha marca</a> para aparecer no Guia.</div>'; return; }
+      A.ocupado(b, true, "Salvando...");
+      q(sb.rpc("salvar_vitrine", { p: { vitrine: liga, slug: slugDe($("#cm-slug").value), bairro: $("#cm-bairro").value, descricao: $("#cm-desc").value } })).then(function (n) {
+        E = Array.isArray(n) ? n[0] : n; A.avisar(liga ? "Vitrine ligada ✅" : "Salvo (vitrine desligada)", "ok"); verComunidade(c);
+      }).catch(function (e) { A.ocupado(b, false); $("#cm-msg").innerHTML = '<div class="aviso erro">' + esc(erroComunidade(e)) + "</div>"; });
+    };
+    if ($("#cm-copiar")) $("#cm-copiar").onclick = function () { A.copiar(link, "Link da vitrine copiado"); };
+    if (!E.vitrine) return;
+    // artes que estão na vitrine
+    q(sb.from("vitrine_artes").select("*").eq("empresa_id", E.id).order("criado_em", { ascending: false })).then(function (ls) {
+      $("#cm-artes").innerHTML = ls.length ? ls.map(function (a) {
+        return '<div class="arte-mini"><img alt="" src="' + esc(P.urlPub("vitrine", a.caminho)) + '"><button class="tirar" data-tirar="' + a.id + '" aria-label="Tirar da vitrine">🗑</button></div>';
+      }).join("") : '<span class="mudo peq">Nenhuma arte ainda.</span>';
+      $$("[data-tirar]", c).forEach(function (bt) {
+        bt.onclick = function () {
+          if (!window.confirm("Tirar esta arte da vitrine?")) return;
+          q(sb.rpc("tirar_da_vitrine", { p_id: bt.dataset.tirar })).then(function (cam) { if (cam) sb.storage.from("vitrine").remove([cam]).catch(function () {}); verComunidade(c); })
+            .catch(function (e) { A.avisar(erroComunidade(e), "erro"); });
+        };
+      });
+    }).catch(function (e) { $("#cm-artes").innerHTML = '<div class="aviso peq">' + esc(erroComunidade(e)) + "</div>"; });
+    verRede($("#cm-rede"), c);
+  }
+  function verRede(el, c) {
+    q(sb.rpc("minha_rede")).then(function (r) {
+      var ps = r.parceiros || [], me = r.me_recomendam || [], sug = r.sugestoes || [];
+      function mini(x, botoes) {
+        var img = x.logo ? P.urlPub("logos", x.logo) : "";
+        return '<div class="linha" style="padding:8px 0;border-top:1px solid var(--borda)">' + (img ? '<img alt="" src="' + esc(img) + '" style="width:44px;height:44px;object-fit:contain;background:#fff;border-radius:10px;border:1px solid var(--borda)">' : "") +
+          '<div style="flex:1;min-width:150px"><a class="forte" target="_blank" rel="noopener" href="' + esc(P.urlVitrine(x.slug)) + '">' + esc(x.nome) + '</a><div class="peq mudo">' + esc([x.ramo, x.cidade].filter(Boolean).join(" · ")) + "</div></div>" + botoes + "</div>";
+      }
+      el.innerHTML = '<h2>🤝 Minha rede</h2><p class="mudo peq">Recomende até 6 parceiros que completam o seu serviço. Eles aparecem como <b>“Recomendamos”</b> na sua vitrine, e você pode divulgar as artes deles nos seus Stories e status. ' +
+        "Indique quem você conhece e confia: é a sua reputação junto.</p>" +
+        "<h3>Recomendo (" + ps.length + " de 6)</h3>" + (ps.length ? ps.map(function (x, n) {
+          return mini(x, '<button class="peq zap" data-div="' + n + '">📤 Divulgar</button><button class="peq" data-tira="' + esc(x.slug) + '">Tirar</button>');
+        }).join("") : '<p class="mudo peq">Ninguém ainda. Veja as sugestões abaixo ou procure pelo nome.</p>') +
+        (me.length ? '<h3 style="margin-top:14px">Recomendam você (' + me.length + ")</h3>" + me.map(function (x) {
+          return mini(x, x.ja_recomendo ? '<span class="selo bom">vocês se recomendam</span>' : '<button class="peq prim" data-rec="' + esc(x.slug) + '">🤝 Recomendar de volta</button>');
+        }).join("") : "") +
+        '<h3 style="margin-top:14px">Procurar no Guia</h3><div class="linha"><input id="rd-busca" type="search" placeholder="Nome, ramo ou bairro (ex.: pintor, gesso, Palmeiras)" style="flex:1"><button class="peq" id="rd-ir">🔎 Procurar</button></div><div id="rd-res"></div>' +
+        (sug.length ? '<h3 style="margin-top:14px">Sugestões em ' + esc(E.cidade || "sua cidade") + "</h3>" + sug.map(function (x) { return mini(x, '<button class="peq" data-rec="' + esc(x.slug) + '">➕ Recomendar</button>'); }).join("") : "") +
+        '<p class="peq" style="margin-top:12px"><a target="_blank" rel="noopener" href="guia.html' + (E.cidade ? "?cidade=" + encodeURIComponent(E.cidade) : "") + '">🗺️ Abrir o Guia' + (E.cidade ? " de " + esc(E.cidade) : "") + "</a></p>";
+      function ligar(raiz) {
+        $$("[data-rec]", raiz).forEach(function (b) {
+          b.onclick = function () { A.ocupado(b, true, "..."); q(sb.rpc("recomendar", { p_slug: b.dataset.rec, p_sim: true })).then(function () { A.avisar("🤝 Parceiro adicionado à sua vitrine", "ok"); verRede(el, c); }).catch(function (e) { A.ocupado(b, false); A.avisar(erroComunidade(e), "erro"); }); };
+        });
+      }
+      ligar(el);
+      $$("[data-tira]", el).forEach(function (b) {
+        b.onclick = function () { if (!window.confirm("Tirar este parceiro da sua vitrine?")) return; q(sb.rpc("recomendar", { p_slug: b.dataset.tira, p_sim: false })).then(function () { verRede(el, c); }).catch(function (e) { A.avisar(erroComunidade(e), "erro"); }); };
+      });
+      $$("[data-div]", el).forEach(function (b) { b.onclick = function () { divulgarParceiro(ps[Number(b.dataset.div)], b); }; });
+      function procurar() {
+        var t = $("#rd-busca", el).value.trim(); if (t.length < 2) return;
+        P.rpc("guia", { p_cidade: null, p_ramo: null, p_busca: t }).then(function (ls) {
+          ls = ls.filter(function (x) { return x.slug !== E.slug; }).slice(0, 20);
+          $("#rd-res", el).innerHTML = ls.length ? ls.map(function (x) {
+            var ja = ps.some(function (p) { return p.slug === x.slug; });
+            return mini(x, ja ? '<span class="selo bom">já recomenda</span>' : '<button class="peq" data-rec="' + esc(x.slug) + '">➕ Recomendar</button>');
+          }).join("") : '<p class="mudo peq">Ninguém encontrado com esse nome no Guia.</p>';
+          ligar($("#rd-res", el));
+        }).catch(function (e) { A.avisar(erroComunidade(e), "erro"); });
+      }
+      $("#rd-ir", el).onclick = procurar;
+      $("#rd-busca", el).onkeydown = function (ev) { if (ev.key === "Enter") procurar(); };
+    }).catch(function (e) { el.innerHTML = '<h2>🤝 Minha rede</h2><div class="aviso">' + esc(erroComunidade(e)) + "</div>"; });
+  }
+  // 📤 divulga o parceiro: a arte mais nova dele (se tiver) + texto com o link da vitrine
+  function divulgarParceiro(x, b) {
+    var link = P.urlVitrine(x.slug), ig = x.instagram ? " " + (String(x.instagram).charAt(0) === "@" ? x.instagram : "@" + x.instagram) : "";
+    var txt = "🤝 Recomendo: " + x.nome + ig + (x.ramo ? " — " + x.ramo : "") + (x.cidade ? " em " + x.cidade : "") + "\n👉 " + link;
+    var arte = x.artes && x.artes[0] ? P.urlPub("vitrine", x.artes[0].caminho) : "";
+    A.copiar(txt, "Texto da recomendação copiado");
+    if (!navigator.share) return;
+    A.ocupado(b, true, "Abrindo...");
+    var pr = arte && podeCompartilhar() ? fetch(arte).then(function (r) { return r.blob(); }).then(function (bl) {
+      return navigator.share({ files: [new File([bl], "parceiro-" + x.slug + ".jpg", { type: bl.type || "image/jpeg" })], text: txt });
+    }) : navigator.share({ title: x.nome, text: txt });
+    pr.catch(function () { /* fechou o compartilhar: o texto já foi copiado */ }).then(function () { A.ocupado(b, false); });
   }
 
   // ---------- Telegram: o robô da empresa publica a arte no canal dela ----------
