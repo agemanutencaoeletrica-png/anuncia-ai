@@ -724,7 +724,7 @@ language sql stable security definer set search_path = public as $$
     'valor', (select valor from public.indicacao_config where id = 1),
     'ativo', (select ativo from public.indicacao_config where id = 1),
     'regras', (select regras from public.indicacao_config where id = 1),
-    'lista', coalesce((select jsonb_agg(jsonb_build_object('nome', d.nome, 'status', i.status, 'valor', i.valor, 'criado_em', i.criado_em, 'liberada_em', i.liberada_em, 'paga_em', i.paga_em) order by i.criado_em desc)
+    'lista', coalesce((select jsonb_agg(jsonb_build_object('id', i.id, 'nome', d.nome, 'status', i.status, 'valor', i.valor, 'criado_em', i.criado_em, 'liberada_em', i.liberada_em, 'paga_em', i.paga_em) order by i.criado_em desc)
       from public.indicacoes i join public.empresas me on me.id = i.indicador_id join public.empresas d on d.id = i.indicado_id where me.dono = auth.uid()), '[]'::jsonb));
 $$;
 
