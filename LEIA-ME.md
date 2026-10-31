@@ -122,6 +122,14 @@ Site: `https://SEU-USUARIO.github.io/anuncia-ai/` · App: `.../app.html` · Pain
 - A empresa **não consegue se liberar**: validade, situação e pagamentos só mudam pelo servidor ou pelo dono.
 - O webhook **não confia no aviso**: busca o pagamento direto no Mercado Pago com o seu token antes de liberar.
 - O token do Mercado Pago, a chave do Brevo e a do WhatsApp ficam só nos segredos do Supabase.
+- O tempo liberado vem do **que o Mercado Pago cobrou** (Pix gerado pelo servidor ou assinatura do cartão), nunca do plano
+  escolhido no cadastro da empresa. **Estorno ou contestação** de um pagamento já liberado tira os meses que ele tinha somado
+  e cancela a recompensa de indicação ainda não paga (se já foi paga, a indicação mostra o aviso para você).
+- O painel do dono confere o **usuário logado** e o **e-mail confirmado** dele (não só o e-mail do login). Crie o seu usuário
+  com *Auto Confirm User* (passo 1.3). Antes de rodar de novo o `schema.sql`, confira no SQL Editor:
+  `select a.email, u.email_confirmed_at from public.admins a left join auth.users u on lower(u.email) = lower(a.email);`
+  — o seu e-mail precisa aparecer com a data preenchida.
+- O nome da empresa nos avisos de e-mail/WhatsApp vai sem links, telefones nem símbolos.
 
 ## 🎁 Indique e ganhe
 - Rode uma vez o `supabase/indicacoes.sql` no SQL Editor do Supabase (já está também no final do `schema.sql`).

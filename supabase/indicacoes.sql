@@ -97,7 +97,7 @@ language sql stable security definer set search_path = public as $$
     'valor', (select valor from public.indicacao_config where id = 1),
     'ativo', (select ativo from public.indicacao_config where id = 1),
     'regras', (select regras from public.indicacao_config where id = 1),
-    'lista', coalesce((select jsonb_agg(jsonb_build_object('nome', d.nome, 'status', i.status, 'valor', i.valor, 'criado_em', i.criado_em, 'liberada_em', i.liberada_em, 'paga_em', i.paga_em) order by i.criado_em desc)
+    'lista', coalesce((select jsonb_agg(jsonb_build_object('id', i.id, 'nome', d.nome, 'status', i.status, 'valor', i.valor, 'criado_em', i.criado_em, 'liberada_em', i.liberada_em, 'paga_em', i.paga_em) order by i.criado_em desc)
       from public.indicacoes i join public.empresas me on me.id = i.indicador_id join public.empresas d on d.id = i.indicado_id where me.dono = auth.uid()), '[]'::jsonb));
 $$;
 
@@ -109,6 +109,12 @@ begin
     update public.indicacoes set status = 'liberada', liberada_em = now(),
       valor = coalesce(valor, (select case when ativo then valor else 0 end from public.indicacao_config where id = 1))
     where indicado_id = new.empresa_id and status = 'aguardando';
+  elsif tg_op = 'UPDATE' and old.status = 'approved' and new.status in ('refunded', 'charged_back') and new.aplicado
+        and not exists (select 1 from public.pagamentos p where p.empresa_id = new.empresa_id and p.id <> new.id and p.aplicado and p.status = 'approved') then
+    -- o pagamento do indicado foi estornado: a recompensa ainda não paga é cancelada; se já foi paga, fica o aviso para o dono
+    update public.indicacoes set status = case when status = 'paga' then status else 'cancelada' end,
+      obs = left(coalesce(obs || ' · ', '') || 'pagamento do indicado ' || case when new.status = 'refunded' then 'estornado' else 'contestado' end || ' em ' || to_char(now(), 'DD/MM/YYYY'), 500)
+    where indicado_id = new.empresa_id and status in ('liberada', 'paga');
   end if;
   return new;
 end $$;

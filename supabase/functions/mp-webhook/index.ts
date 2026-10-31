@@ -46,9 +46,34 @@ async function assinaturaOk(req: Request, dataId: string) {
     const manifesto = "id:" + id + ";request-id:" + reqId + ";ts:" + partes.ts + ";";
     const mac = new Uint8Array(await crypto.subtle.sign("HMAC", chave, new TextEncoder().encode(manifesto)));
     const hex = Array.from(mac).map((b) => b.toString(16).padStart(2, "0")).join("");
-    if (hex === partes.v1) return true;
+    if (iguais(hex, partes.v1.toLowerCase())) return true;
   }
   return false;
+}
+
+// comparação em tempo constante (não revela quantos caracteres da assinatura batem)
+function iguais(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+// plano de uma cobrança do cartão: sai da assinatura no Mercado Pago (de quantos em quantos meses ela cobra),
+// nunca do plano gravado no cadastro da empresa. Sem assinatura conhecida, conta como o plano mais curto.
+// valorPago: quando a assinatura não veio no próprio pagamento, só vale a assinatura já autorizada e com o mesmo valor.
+async function planoDaCobranca(preapprovalId: string | null, valorPago: number | null = null) {
+  let meses = 0;
+  if (preapprovalId) {
+    const a = await mp("/preapproval/" + encodeURIComponent(preapprovalId));
+    const ar = a.auto_recurring || {};
+    const confere = valorPago === null || (a.status === "authorized" && Math.abs(Number(ar.transaction_amount) - valorPago) < 0.01);
+    if (confere && ar.frequency_type === "months") meses = Number(ar.frequency) || 0;
+  }
+  const ps = meses ? await db("planos?select=id&meses=eq." + meses + "&order=ativo.desc&limit=1") : [];
+  if (ps && ps[0]) return ps[0].id;
+  const curto = await db("planos?select=id&order=meses.asc&limit=1");
+  return curto && curto[0] ? curto[0].id : null;
 }
 
 async function empresaPor(ref: string | null, assinatura: string | null) {
@@ -61,7 +86,7 @@ async function empresaPor(ref: string | null, assinatura: string | null) {
 }
 
 // grava (ou atualiza) o pagamento e, se aprovado, soma os meses na validade
-async function registrarPagamento(p: any, empresa: any, tipo: string) {
+async function registrarPagamento(p: any, empresa: any, tipo: string, plano: () => Promise<string | null>) {
   const mpId = String(p.id);
   const atual = (await db("pagamentos?select=*&mp_id=eq." + encodeURIComponent(mpId)))[0];
   if (atual) {
@@ -69,7 +94,7 @@ async function registrarPagamento(p: any, empresa: any, tipo: string) {
       body: { status: p.status, pago_em: p.status === "approved" ? (p.date_approved || new Date().toISOString()) : null } });
   } else {
     await db("pagamentos", { method: "POST", prefer: "return=minimal,resolution=ignore-duplicates",
-      body: { empresa_id: empresa.id, mp_id: mpId, tipo, plano: empresa.plano, valor: Number(p.transaction_amount) || null, status: p.status,
+      body: { empresa_id: empresa.id, mp_id: mpId, tipo, plano: await plano(), valor: Number(p.transaction_amount) || null, status: p.status,
         pago_em: p.status === "approved" ? (p.date_approved || new Date().toISOString()) : null } });
   }
   if (p.status !== "approved") return { mpId, status: p.status, aplicado: false };
@@ -90,7 +115,8 @@ export async function processar(tipo: string, id: string) {
     const o = await mp("/v1/orders/" + encodeURIComponent(id));
     const empresa = await empresaPor(o.external_reference || null, null);
     if (!empresa) return { ignorado: "empresa não encontrada", id };
-    return await registrarPagamento(pagamentoDoPedido(o), empresa, "pix");
+    // o Pix é gravado pela função "assinar" com o plano e o valor cobrados; se não estiver lá, conta como o plano mais curto
+    return await registrarPagamento(pagamentoDoPedido(o), empresa, "pix", () => planoDaCobranca(null));
   }
   if (tipo === "payment") {
     const p = await mp("/v1/payments/" + encodeURIComponent(id));
@@ -100,7 +126,8 @@ export async function processar(tipo: string, id: string) {
     const assin = (p.metadata && (p.metadata.preapproval_id || p.metadata.subscription_id)) || (p.point_of_interaction && p.point_of_interaction.transaction_data && p.point_of_interaction.transaction_data.subscription_id) || null;
     const empresa = await empresaPor(p.external_reference || null, assin);
     if (!empresa) return { ignorado: "empresa não encontrada", id };
-    return await registrarPagamento(p, empresa, p.payment_method_id === "pix" ? "pix" : "cartao");
+    return await registrarPagamento(p, empresa, p.payment_method_id === "pix" ? "pix" : "cartao",
+      () => assin ? planoDaCobranca(String(assin)) : planoDaCobranca(empresa.mp_assinatura || null, Number(p.transaction_amount) || 0));
   }
   if (tipo === "subscription_authorized_payment") {
     const ap = await mp("/authorized_payments/" + encodeURIComponent(id));
@@ -109,7 +136,7 @@ export async function processar(tipo: string, id: string) {
     const pid = ap.payment && ap.payment.id;
     if (!pid) return { ignorado: "cobrança sem pagamento ainda", id };
     const p = await mp("/v1/payments/" + encodeURIComponent(String(pid)));
-    return await registrarPagamento(p, empresa, "cartao");
+    return await registrarPagamento(p, empresa, "cartao", () => planoDaCobranca(ap.preapproval_id ? String(ap.preapproval_id) : null));
   }
   if (tipo === "subscription_preapproval") {
     const a = await mp("/preapproval/" + encodeURIComponent(id));

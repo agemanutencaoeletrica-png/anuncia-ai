@@ -89,7 +89,7 @@
     }).then(function (r) {
       PLANOS = r[1] || [];
       if (!r[0] || !r[0].length) { telaPrimeiroAcesso(); return; }
-      E = r[0][0]; carregarLogo(); montar(); conferirRespostas();
+      E = r[0][0]; carregarLogo(); montar(); conferirRespostas(); conferirIndicacoes();
     }).catch(function (e) { telaLogin(A.msgErro(e)); });
   }
   function urlLogo() { return E.logo ? sb.storage.from("logos").getPublicUrl(E.logo).data.publicUrl : null; }
@@ -144,12 +144,19 @@
     window.removeEventListener("hashchange", rota); window.addEventListener("hashchange", rota);
     rota();
   }
+  // app aberto há tempo (celular): ao voltar para ele, confere de novo se tem indicação paga ou resposta nova
+  var conferidoEm = Date.now();
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || !E || !$("#abas") || Date.now() - conferidoEm < 60000) return;
+    conferidoEm = Date.now(); conferirRespostas(); conferirIndicacoes();
+  });
   function faixa() {
     var s = A.situacao(E), h = "";
     if (s.bloqueada) h = '<div class="aviso erro" style="margin:12px 16px 0"><b>Acesso pausado.</b> ' + (E.status === "teste" || s.teste ? "O teste grátis terminou." : "Não identificamos o pagamento.") +
       ' <a href="#assinatura">Pague aqui</a> e o acesso volta na hora.</div>';
     else if (s.teste) h = '<div class="aviso" style="margin:12px 16px 0">🎁 Teste grátis: <b>' + (s.dias <= 1 ? "termina hoje" : s.dias + " dias restantes") + '</b>. <a href="#assinatura">Assinar</a></div>';
     else if (s.dias <= 5 && !s.cartao) h = '<div class="aviso" style="margin:12px 16px 0">Sua assinatura vence em <b>' + A.data(E.valido_ate) + '</b>. <a href="#assinatura">Pagar agora</a></div>';
+    if (IND_NOVAS && location.hash.slice(1) !== "indique") h += '<div class="aviso ok" style="margin:12px 16px 0">' + esc(IND_MSG) + ' <a href="#indique">Ver</a></div>';
     $("#faixa").innerHTML = h;
   }
   function rota() {
@@ -157,18 +164,40 @@
     if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "criar";
     if (A.situacao(E).bloqueada && aba !== "assinatura" && aba !== "sugestoes" && aba !== "mais") aba = "assinatura";
     if (vigiaPix && aba !== "assinatura") { clearInterval(vigiaPix); vigiaPix = null; }
-    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" && RESP_NOVAS ? '<span class="bolinha">' + RESP_NOVAS + "</span>" : "") + "</a>"; }).join("");
+    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + bolinha(a[0] === "sugestoes" ? RESP_NOVAS : a[0] === "indique" ? IND_NOVAS : 0) + "</a>"; }).join("");
     faixa();
     var c = $("#conteudo");
     ({ criar: verCriar, marca: verMarca, comunidade: verComunidade, indique: verIndique, assinatura: verAssinatura, sugestoes: verSugestoes, mais: verMais })[aba](c);
   }
 
+  function bolinha(n) { return n ? '<span class="bolinha">' + n + "</span>" : ""; }
+
   // ---------- 🎁 indique e ganhe ----------
-  var ST_IND = { aguardando: ["⏳ aguardando o 1º pagamento", ""], liberada: ["💰 a receber", "atencao"], paga: ["✅ paga", "bom"], cancelada: ["cancelada", "critico"] };
+  var ST_IND = { aguardando: ["⏳ aguardando o 1º pagamento", ""], liberada: ["💰 a receber", "atencao"], paga: ["✅ PG", "bom"], cancelada: ["cancelada", "critico"] };
+  // aviso de indicação: o indicado pagou (você tem a receber) ou a recompensa foi paga (PG).
+  // Bolinha na aba e faixa no topo até a pessoa abrir a aba e ver (o que já viu fica guardado neste aparelho; a situação fica salva no banco)
+  var IND_NOVAS = 0, IND_MSG = "";
+  function chaveIndV() { return "anuncia_ind_vistas_" + E.id; }
+  function indVistas() { try { return JSON.parse(localStorage.getItem(chaveIndV()) || "{}"); } catch (e) { return {}; } }
+  function marcaInd(x) { return (x.id || x.nome + "|" + x.criado_em) + ":" + x.status; }
+  function indNova(x, v) { return (x.status === "liberada" || x.status === "paga") && !v[marcaInd(x)]; }
+  function msgInd(x) {
+    return x.status === "paga" ? "✅ Recompensa paga: a indicação da " + x.nome + " (" + A.dinheiro(x.valor) + ") foi paga em " + A.data(x.paga_em) + "."
+      : "🎁 A " + x.nome + ", que você indicou, fez o primeiro pagamento! Você tem " + A.dinheiro(x.valor) + " a receber.";
+  }
+  function conferirIndicacoes() {
+    q(sb.rpc("minhas_indicacoes")).then(function (d) {
+      var v = indVistas(), nv = (d.lista || []).filter(function (x) { return indNova(x, v); });
+      IND_NOVAS = nv.length;
+      if (!IND_NOVAS || location.hash.slice(1) === "indique") return;
+      IND_MSG = nv.length === 1 ? msgInd(nv[0]) : "🎁 " + nv.length + " novidades nas suas indicações: " + nv.map(function (x) { return x.nome + (x.status === "paga" ? " (✅ PG)" : " (💰 a receber)"); }).join(", ") + ".";
+      rota(); A.avisar(IND_MSG, "ok");
+    }).catch(function () { /* indicações ainda não ativas */ });
+  }
   function verIndique(c) {
     c.innerHTML = '<div class="cartao"><div class="vazio">Carregando...</div></div>';
     Promise.all([q(sb.rpc("meu_codigo_indicacao")), q(sb.rpc("minhas_indicacoes"))]).then(function (r) {
-      var cod = r[0], d = r[1], lista = d.lista || [], valor = Number(d.valor) || 0;
+      var cod = r[0], d = r[1], lista = d.lista || [], valor = Number(d.valor) || 0, vistas = indVistas();
       var link = location.href.split("#")[0].split("?")[0].replace(/[^/]*$/, "") + "index.html?ind=" + cod;
       var aReceber = lista.filter(function (x) { return x.status === "liberada"; }), pagas = lista.filter(function (x) { return x.status === "paga"; });
       var soma = function (l) { return l.reduce(function (t, x) { return t + (Number(x.valor) || 0); }, 0); };
@@ -183,11 +212,17 @@
         '<div class="cartao"><h3>Chave Pix para receber</h3><div class="linha" style="flex-wrap:nowrap"><input id="ind-pix" maxlength="120" placeholder="CPF, CNPJ, celular, e-mail ou chave aleatória" value="' + esc(d.pix || "") + '"><button class="prim" id="ind-pix-s">Salvar</button></div></div>' +
         '<div class="cartao"><div class="linha"><h3>Suas indicações (' + lista.length + ')</h3><span class="dir peq">A receber: <b>' + A.dinheiro(soma(aReceber)) + "</b> · Recebido: <b>" + A.dinheiro(soma(pagas)) + "</b></span></div>" +
         (lista.length ? '<div class="tabela"><table><thead><tr><th>Empresa indicada</th><th>Desde</th><th>Situação</th><th class="num">Valor</th></tr></thead><tbody>' + lista.map(function (x) {
-          var st = ST_IND[x.status] || [x.status, ""];
-          return "<tr><td>" + esc(x.nome) + "</td><td>" + A.data(x.criado_em) + '</td><td><span class="selo ' + st[1] + '">' + st[0] + (x.paga_em ? " " + A.data(x.paga_em) : "") + '</span></td><td class="num">' + (x.valor ? A.dinheiro(x.valor) : "—") + "</td></tr>";
+          var st = ST_IND[x.status] || [x.status, ""], nova = indNova(x, vistas);
+          return "<tr" + (nova ? ' class="ind-nova"' : "") + "><td>" + esc(x.nome) + (nova ? ' <span class="selo critico">🔴 novo</span>' : "") + "</td><td>" + A.data(x.criado_em) + '</td><td><span class="selo ' + st[1] + '">' + st[0] +
+            (x.status === "paga" && x.paga_em ? " em " + A.data(x.paga_em) : "") + "</span>" + (x.liberada_em && x.status !== "cancelada" ? '<div class="peq mudo">indicado pagou em ' + A.data(x.liberada_em) + "</div>" : "") +
+            '</td><td class="num">' + (x.valor ? A.dinheiro(x.valor) : "—") + "</td></tr>";
         }).join("") + "</tbody></table></div>" : '<div class="vazio">Ninguém ainda. Mande o seu link para os seus contatos!</div>') + "</div>" +
         (d.fui_indicado ? "" : '<details class="cartao"><summary><b>Alguém indicou você?</b></summary><p class="peq mudo">Vale até 30 dias depois do cadastro e antes do primeiro pagamento.</p>' +
           '<div class="linha" style="flex-wrap:nowrap"><input id="ind-usar" maxlength="12" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:2px" placeholder="Código" value="' + esc(indGuardado()) + '"><button id="ind-usar-b">Usar código</button></div></details>');
+      // abriu e viu: deixa de ser novidade (o destaque fica até sair da aba)
+      lista.forEach(function (x) { if (x.status === "liberada" || x.status === "paga") vistas[marcaInd(x)] = 1; });
+      try { localStorage.setItem(chaveIndV(), JSON.stringify(vistas)); } catch (e) { /* sem armazenamento */ }
+      if (IND_NOVAS) { IND_NOVAS = 0; var ab = $('#abas a[href="#indique"] .bolinha'); if (ab) ab.remove(); }
       $("#ind-copiar").onclick = function () { A.copiar(link, "Link copiado"); };
       $("#ind-pix-s").onclick = function () {
         var b = this; A.ocupado(b, true, "...");

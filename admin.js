@@ -51,12 +51,17 @@
     window.addEventListener("hashchange", rota); rota();
     var nv = (S.sug || []).filter(function (x) { return !x.lida; }).length;
     if (nv) A.avisar("💡 " + nv + (nv > 1 ? " sugestões novas" : " sugestão nova") + " dos clientes", "ok");
+    var ap = aPagarInd();
+    if (ap.length) A.avisar("💰 " + ap.length + (ap.length > 1 ? " indicações a pagar" : " indicação a pagar") + " (" + A.dinheiro(somaInd(ap)) + "). Veja em 🎁 Indicações.", "ok");
   }
+  function aPagarInd() { return (S.ind || []).filter(function (x) { return x.status === "liberada"; }); }
+  function somaInd(l) { return l.reduce(function (t, x) { return t + (Number(x.valor) || 0); }, 0); }
   var ABAS = [["empresas", "Empresas"], ["pagamentos", "Pagamentos"], ["indicacoes", "🎁 Indicações"], ["avisos", "Avisos enviados"], ["sugestoes", "Sugestões"], ["interessados", "✨ Interessados"], ["planos", "Planos"]];
   function rota() {
     var aba = location.hash.slice(1) || "empresas"; if (!ABAS.some(function (a) { return a[0] === aba; })) aba = "empresas";
-    var novas = (S.sug || []).filter(function (x) { return !x.lida; }).length;
-    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" && novas ? '<span class="bolinha" aria-label="' + novas + ' novas">' + novas + "</span>" : "") + "</a>"; }).join("");
+    var novas = (S.sug || []).filter(function (x) { return !x.lida; }).length, ap = aPagarInd().length;
+    var bol = function (n, r) { return n ? '<span class="bolinha" aria-label="' + n + " " + r + '">' + n + "</span>" : ""; };
+    $("#abas").innerHTML = ABAS.map(function (a) { return '<a href="#' + a[0] + '" class="' + (a[0] === aba ? "ativa" : "") + '">' + a[1] + (a[0] === "sugestoes" ? bol(novas, "novas") : a[0] === "indicacoes" ? bol(ap, "a pagar") : "") + "</a>"; }).join("");
     document.title = (novas ? "(" + novas + ") " : "") + "Anuncia Aí — Painel";
     ({ empresas: verEmpresas, pagamentos: verPagamentos, indicacoes: verIndicacoes, avisos: verAvisos, sugestoes: verSugestoes, interessados: verInteressados, planos: verPlanos })[aba]($("#conteudo"));
   }
@@ -167,8 +172,15 @@
   function verIndicacoes(c) {
     if (!S.ind) { c.innerHTML = '<div class="cartao"><h2>🎁 Indicações</h2><div class="aviso">Rode uma vez o <b>supabase/indicacoes.sql</b> no SQL Editor do Supabase.</div></div>'; return; }
     var emp = function (id) { return S.emp.filter(function (x) { return x.id === id; })[0] || {}; };
-    var ST = { aguardando: ["⏳ aguardando 1º pagamento", ""], liberada: ["💰 a pagar", "atencao"], paga: ["✅ paga", "bom"], cancelada: ["cancelada", "critico"] };
-    var aPagar = S.ind.filter(function (x) { return x.status === "liberada"; }), soma = function (l) { return l.reduce(function (t, x) { return t + (Number(x.valor) || 0); }, 0); };
+    var ST = { aguardando: ["⏳ aguardando 1º pagamento", ""], liberada: ["💰 a pagar", "atencao"], paga: ["✅ PG", "bom"], cancelada: ["cancelada", "critico"] };
+    // mensagem para quem indicou (o app dele também avisa sozinho, com bolinha na aba 🎁)
+    var zap = function (x, a, b) {
+      if (!a.whatsapp) return "";
+      var t = x.status === "paga" ? "Olá! Aqui é do Anuncia Aí. 🎁 A sua indicação da " + (b.nome || "empresa indicada") + " foi paga: " + A.dinheiro(x.valor) + " no Pix " + (a.pix_indicacao || "") + " em " + A.data(x.paga_em) + ". Obrigado por indicar!"
+        : "Olá! Aqui é do Anuncia Aí. 🎁 A " + (b.nome || "empresa") + ", que você indicou, fez o primeiro pagamento. Você tem " + A.dinheiro(x.valor) + " a receber" + (a.pix_indicacao ? " no Pix " + a.pix_indicacao : ": cadastre a sua chave Pix na aba 🎁 Indique e ganhe") + ".";
+      return ' <a class="botao peq zap" target="_blank" rel="noopener" href="' + esc(A.linkZap(a.whatsapp, t)) + '">💬 Avisar</a>';
+    };
+    var aPagar = aPagarInd(), soma = somaInd;
     var cfg = S.indCfg || { valor: 10, ativo: true, regras: "" };
     c.innerHTML = '<div class="grade"><div class="ladrilho"><div class="r">A pagar</div><div class="v">' + A.dinheiro(soma(aPagar)) + '</div><div class="d">' + aPagar.length + ' indicação(ões)</div></div>' +
       '<div class="ladrilho"><div class="r">Já pagas</div><div class="v">' + A.dinheiro(soma(S.ind.filter(function (x) { return x.status === "paga"; }))) + '</div></div>' +
@@ -178,11 +190,14 @@
         var a = emp(x.indicador_id), b = emp(x.indicado_id), st = ST[x.status] || [x.status, ""];
         return "<tr><td>" + A.data(x.criado_em) + "</td><td><b>" + esc(a.nome || "—") + '</b><div class="peq mudo">' + esc(a.whatsapp || a.email || "") + " · código " + esc(x.codigo || a.codigo_indicacao || "") + "</div></td><td>" +
           (a.pix_indicacao ? esc(a.pix_indicacao) + ' <button class="peq" data-ind-copiar="' + esc(a.pix_indicacao) + '">📋</button>' : '<span class="selo critico">sem chave Pix</span>') + "</td><td>" + esc(b.nome || "—") +
-          '<div class="peq mudo">' + esc(b.status || "") + (b.valido_ate ? " até " + A.data(b.valido_ate) : "") + '</div></td><td><span class="selo ' + st[1] + '">' + st[0] + (x.paga_em ? " " + A.data(x.paga_em) : "") + '</span></td><td class="num">' + (x.valor ? A.dinheiro(x.valor) : "—") + "</td><td>" +
+          '<div class="peq mudo">' + esc(b.status || "") + (b.valido_ate ? " até " + A.data(b.valido_ate) : "") + '</div></td><td><span class="selo ' + st[1] + '">' + st[0] + (x.status === "paga" && x.paga_em ? " em " + A.data(x.paga_em) : "") + "</span>" +
+          (x.liberada_em && x.status !== "cancelada" ? '<div class="peq mudo">indicado pagou em ' + A.data(x.liberada_em) + "</div>" : "") +
+          (x.obs ? '<div class="peq mudo">' + esc(x.obs) + "</div>" : "") + '</td><td class="num">' + (x.valor ? A.dinheiro(x.valor) : "—") + "</td><td>" +
           (x.status === "liberada" ? '<button class="peq prim" data-ind="' + x.id + '" data-st="paga">✅ Paguei</button> ' : "") +
           (x.status === "aguardando" ? '<button class="peq" data-ind="' + x.id + '" data-st="liberada">Liberar agora</button> ' : "") +
           (x.status !== "cancelada" && x.status !== "paga" ? '<button class="peq" data-ind="' + x.id + '" data-st="cancelada">Cancelar</button>' : "") +
-          (x.status === "paga" || x.status === "cancelada" ? '<button class="peq" data-ind="' + x.id + '" data-st="liberada">Reabrir</button>' : "") + "</td></tr>";
+          (x.status === "paga" || x.status === "cancelada" ? '<button class="peq" data-ind="' + x.id + '" data-st="liberada">Reabrir</button>' : "") +
+          (x.status === "liberada" || x.status === "paga" ? zap(x, a, b) : "") + "</td></tr>";
       }).join("") + "</tbody></table></div>" : '<div class="vazio">Nenhuma indicação ainda.</div>') + "</div>" +
       '<div class="cartao"><h3>Regras</h3><div class="duas"><div><label for="ic-valor">Valor por indicação que pagou (R$)</label><input id="ic-valor" inputmode="decimal" value="' + esc(Number(cfg.valor).toFixed(2).replace(".", ",")) + '"></div>' +
       '<div><label class="marca-linha" style="margin-top:30px"><input type="checkbox" id="ic-ativo"' + (cfg.ativo ? " checked" : "") + "> Programa ativo</label></div></div>" +
@@ -193,9 +208,10 @@
       b.onclick = function () {
         var st = b.dataset.st;
         if (st === "cancelada" && !confirm("Cancelar esta indicação? Ela não será paga.")) return;
+        if (b.textContent === "Reabrir" && !confirm("Reabrir? Ela volta para “a pagar”.")) return;
         A.ocupado(b, true, "...");
         q(sb.rpc("admin_indicacao", { p_id: b.dataset.ind, p_status: st })).then(function (n) {
-          S.ind = S.ind.map(function (x) { return x.id === n.id ? n : x; }); A.avisar(st === "paga" ? "Indicação marcada como paga." : "Atualizado.", "ok"); verIndicacoes(c);
+          S.ind = S.ind.map(function (x) { return x.id === n.id ? n : x; }); A.avisar(st === "paga" ? "✅ Marcada como PG e salva. Quem indicou vê no app; toque em 💬 Avisar para mandar no WhatsApp." : "Atualizado.", "ok"); rota();
         }).catch(function (e) { A.ocupado(b, false); A.avisar(A.msgErro(e), "erro"); });
       };
     });
