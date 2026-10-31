@@ -60,22 +60,31 @@ export function decidir(e: any, agora: Date) {
   return null;
 }
 
+// nome da empresa como foi cadastrado pelo próprio cliente: sem links, telefones nem símbolos, e curto,
+// para que o aviso enviado em nome do Anuncia Aí não leve texto de terceiros
+export function nomeSeguro(t: string) {
+  const n = String(t || "")
+    .replace(/https?:\/\/\S*|www\.\S*|\S+@\S+|\S+\.(com|br|net|org|io|me|ly|app|site|online|link)\S*/gi, " ")
+    .replace(/[^\p{L}\p{N} &'-]/gu, " ").replace(/\d{3,}/g, " ").replace(/\s+/g, " ").trim().slice(0, 40).trim();
+  return n || "cliente";
+}
+
 export function mensagem(e: any, d: any, pix: any) {
   const app = (env("APP_URL") || "") + "/app.html#assinatura", data = dataVisivel(e.valido_ate);
   const teste = e.status === "teste", cartao = e.metodo === "cartao" && !!e.mp_assinatura;
   let assunto: string, texto: string;
   if (d.tipo === "cartao_falhou") {
     assunto = "Não conseguimos cobrar no seu cartão — Anuncia Aí";
-    texto = "Olá, " + e.nome + "! A cobrança da sua assinatura no cartão ainda não foi aprovada. O Mercado Pago vai tentar de novo; " +
+    texto = "Olá, " + nomeSeguro(e.nome) + "! A cobrança da sua assinatura no cartão ainda não foi aprovada. O Mercado Pago vai tentar de novo; " +
       "para não perder o acesso, confira o cartão no Mercado Pago ou pague pelo Pix.";
   } else if (d.tipo === "bloqueio") {
     assunto = "Seu acesso ao Anuncia Aí foi pausado";
-    texto = "Olá, " + e.nome + "! " + (teste ? "Seu teste grátis terminou" : "Não identificamos o pagamento da sua assinatura") +
+    texto = "Olá, " + nomeSeguro(e.nome) + "! " + (teste ? "Seu teste grátis terminou" : "Não identificamos o pagamento da sua assinatura") +
       " e o acesso ao Anuncia Aí foi pausado. Assim que o pagamento for feito, o acesso volta na hora.";
   } else {
     const quando = d.dias <= 0 ? "hoje" : d.dias === 1 ? "amanhã" : "em " + d.dias + " dias";
     assunto = (teste ? "Seu teste grátis do Anuncia Aí termina " : "Sua assinatura do Anuncia Aí vence ") + quando + " (" + data + ")";
-    texto = "Olá, " + e.nome + "! " + (teste ? "Seu teste grátis termina " : "Sua assinatura vence ") + quando + ", em " + data + ". " +
+    texto = "Olá, " + nomeSeguro(e.nome) + "! " + (teste ? "Seu teste grátis termina " : "Sua assinatura vence ") + quando + ", em " + data + ". " +
       (cartao ? "A renovação é automática no seu cartão. Se o cartão não passar, pague pelo Pix para não perder o acesso." :
         "Para continuar usando sem interrupção, faça o pagamento até essa data. Depois disso o acesso é pausado.");
   }
@@ -97,7 +106,7 @@ export async function enviarEmail(e: any, m: any) {
   if (!env("BREVO_API_KEY") || !env("EMAIL_FROM")) return { pulado: "e-mail não configurado" };
   const r = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST", headers: { "api-key": env("BREVO_API_KEY"), "Content-Type": "application/json", accept: "application/json" },
-    body: JSON.stringify({ sender: { name: "Anuncia Aí", email: env("EMAIL_FROM") }, to: [{ email: e.email, name: e.nome }], subject: m.assunto, htmlContent: html(m) }),
+    body: JSON.stringify({ sender: { name: "Anuncia Aí", email: env("EMAIL_FROM") }, to: [{ email: e.email, name: nomeSeguro(e.nome) }], subject: m.assunto, htmlContent: html(m) }),
   });
   if (!r.ok) throw new Error("Brevo " + r.status + ": " + (await r.text()).slice(0, 200));
   return { ok: true };
@@ -118,7 +127,7 @@ export async function enviarWhats(e: any, m: any, d: any) {
     method: "POST", headers: { Authorization: "Bearer " + env("WHATSAPP_TOKEN"), "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", to: para, type: "template", template: {
       name: env("WHATSAPP_TEMPLATE") || "aviso_vencimento", language: { code: "pt_BR" },
-      components: [{ type: "body", parameters: [{ type: "text", text: e.nome }, { type: "text", text: curto }, { type: "text", text: m.linkPagar }] }] } }),
+      components: [{ type: "body", parameters: [{ type: "text", text: nomeSeguro(e.nome) }, { type: "text", text: curto }, { type: "text", text: m.linkPagar }] }] } }),
   });
   if (!r.ok) throw new Error("WhatsApp " + r.status + ": " + (await r.text()).slice(0, 200));
   return { ok: true };

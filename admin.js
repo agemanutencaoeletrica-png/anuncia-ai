@@ -191,7 +191,8 @@
         return "<tr><td>" + A.data(x.criado_em) + "</td><td><b>" + esc(a.nome || "—") + '</b><div class="peq mudo">' + esc(a.whatsapp || a.email || "") + " · código " + esc(x.codigo || a.codigo_indicacao || "") + "</div></td><td>" +
           (a.pix_indicacao ? esc(a.pix_indicacao) + ' <button class="peq" data-ind-copiar="' + esc(a.pix_indicacao) + '">📋</button>' : '<span class="selo critico">sem chave Pix</span>') + "</td><td>" + esc(b.nome || "—") +
           '<div class="peq mudo">' + esc(b.status || "") + (b.valido_ate ? " até " + A.data(b.valido_ate) : "") + '</div></td><td><span class="selo ' + st[1] + '">' + st[0] + (x.status === "paga" && x.paga_em ? " em " + A.data(x.paga_em) : "") + "</span>" +
-          (x.liberada_em && x.status !== "cancelada" ? '<div class="peq mudo">indicado pagou em ' + A.data(x.liberada_em) + "</div>" : "") + '</td><td class="num">' + (x.valor ? A.dinheiro(x.valor) : "—") + "</td><td>" +
+          (x.liberada_em && x.status !== "cancelada" ? '<div class="peq mudo">indicado pagou em ' + A.data(x.liberada_em) + "</div>" : "") +
+          (x.obs ? '<div class="peq mudo">' + esc(x.obs) + "</div>" : "") + '</td><td class="num">' + (x.valor ? A.dinheiro(x.valor) : "—") + "</td><td>" +
           (x.status === "liberada" ? '<button class="peq prim" data-ind="' + x.id + '" data-st="paga">✅ Paguei</button> ' : "") +
           (x.status === "aguardando" ? '<button class="peq" data-ind="' + x.id + '" data-st="liberada">Liberar agora</button> ' : "") +
           (x.status !== "cancelada" && x.status !== "paga" ? '<button class="peq" data-ind="' + x.id + '" data-st="cancelada">Cancelar</button>' : "") +

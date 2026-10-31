@@ -93,9 +93,11 @@ on conflict (id) do nothing;
 
 create or replace function public.eh_admin() returns boolean
 language sql stable security definer set search_path = public as $$
+  -- confere pelo usuário logado (auth.uid) e pelo e-mail atual e confirmado dele, não só pelo e-mail do login
   select exists (
     select 1 from public.admins a
-    where lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    join auth.users u on lower(u.email) = lower(a.email)
+    where u.id = auth.uid() and u.email_confirmed_at is not null
   );
 $$;
 
@@ -144,19 +146,22 @@ begin
     cor1      = coalesce(substring(p ->> 'cor1' from '^#[0-9a-fA-F]{6}$'), cor1),
     cor2      = coalesce(substring(p ->> 'cor2' from '^#[0-9a-fA-F]{6}$'), cor2),
     logo      = case when p ? 'logo' then nullif(p ->> 'logo', '') else logo end,
-    plano     = case when p ->> 'plano' in (select id from public.planos where ativo) then p ->> 'plano' else plano end,
     aceita_whatsapp = coalesce((p ->> 'aceita_whatsapp')::boolean, aceita_whatsapp)
   where dono = auth.uid()
   returning * into e;
   if not found then raise exception 'Empresa não encontrada.'; end if;
-  if e.logo is not null and split_part(e.logo, '/', 1) <> e.id::text then
+  if e.logo is not null and (split_part(e.logo, '/', 1) <> e.id::text or e.logo like '%..%') then
     raise exception 'Logo inválido.';
   end if;
   return e;
 end $$;
 
+alter table public.pagamentos add column if not exists meses_aplicados integer;   -- meses que este pagamento somou na validade
+alter table public.pagamentos add column if not exists estornado_em timestamptz;    -- quando o estorno tirou esses meses
+
 -- soma meses na validade a partir de hoje ou do vencimento (o que for maior).
--- Usada pelo servidor quando o Mercado Pago confirma o pagamento.
+-- Usada pelo servidor quando o Mercado Pago confirma o pagamento. Os meses vêm do plano
+-- gravado no pagamento (definido pelo servidor), nunca do plano escolhido no cadastro da empresa.
 create or replace function public.aplicar_pagamento(p_mp_id text) returns public.empresas
 language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -168,15 +173,31 @@ begin
   if not found then raise exception 'Pagamento % não encontrado.', p_mp_id; end if;
   select * into e from public.empresas where id = pg.empresa_id for update;
   if pg.aplicado or pg.status <> 'approved' then return e; end if;
-  select meses into v_meses from public.planos where id = coalesce(pg.plano, e.plano);
+  select meses into v_meses from public.planos where id = pg.plano;
+  v_meses := coalesce(v_meses, 1);
   update public.empresas set
     status = 'ativa',
     plano = coalesce(pg.plano, plano),
-    valido_ate = greatest(now(), valido_ate) + make_interval(months => coalesce(v_meses, 1))
+    valido_ate = greatest(now(), valido_ate) + make_interval(months => v_meses)
   where id = e.id returning * into e;
-  update public.pagamentos set aplicado = true, pago_em = coalesce(pago_em, now()), pix_qr = null, pix_copia = null where id = pg.id;
+  update public.pagamentos set aplicado = true, meses_aplicados = v_meses, pago_em = coalesce(pago_em, now()), pix_qr = null, pix_copia = null where id = pg.id;
   return e;
 end $$;
+
+-- pagamento estornado ou contestado no Mercado Pago depois de liberado: tira os meses que ele tinha somado
+create or replace function public.tg_estorno_pagamento() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if old.status = 'approved' and new.status in ('refunded', 'charged_back') and new.aplicado and new.estornado_em is null then
+    update public.empresas set valido_ate = valido_ate - make_interval(months =>
+      coalesce(new.meses_aplicados, (select meses from public.planos where id = new.plano), 1)) where id = new.empresa_id;
+    update public.pagamentos set estornado_em = now() where id = new.id;
+  end if;
+  return new;
+end $$;
+drop trigger if exists estorno_pagamento on public.pagamentos;
+create trigger estorno_pagamento after update of status on public.pagamentos for each row execute function public.tg_estorno_pagamento();
+revoke execute on function public.tg_estorno_pagamento() from public, anon, authenticated;
 
 -- ---------- Regras de acesso (RLS) ----------
 
@@ -213,6 +234,8 @@ create policy avisos_admin on public.avisos for all to authenticated using (publ
 
 revoke execute on function public.aplicar_pagamento(text) from public, anon, authenticated;
 grant execute on function public.eh_admin() to anon, authenticated;
+revoke execute on function public.criar_empresa(text, text, text, text, text) from public, anon;
+revoke execute on function public.salvar_perfil(jsonb) from public, anon;
 grant execute on function public.criar_empresa(text, text, text, text, text) to authenticated;
 grant execute on function public.salvar_perfil(jsonb) to authenticated;
 
@@ -448,7 +471,7 @@ declare
 begin
   select id into v_emp from public.empresas where dono = auth.uid();
   if v_emp is null then raise exception 'Empresa não encontrada.'; end if;
-  if split_part(coalesce(p_caminho, ''), '/', 1) <> v_emp::text then raise exception 'Arquivo inválido.'; end if;
+  if split_part(coalesce(p_caminho, ''), '/', 1) <> v_emp::text or p_caminho like '%..%' then raise exception 'Arquivo inválido.'; end if;
   insert into public.vitrine_artes (empresa_id, caminho, legenda, criado_em) values (v_emp, p_caminho, left(p_legenda, 600), clock_timestamp());
   with velhas as (
     select id, caminho from public.vitrine_artes where empresa_id = v_emp order by criado_em desc offset 12
@@ -736,6 +759,12 @@ begin
     update public.indicacoes set status = 'liberada', liberada_em = now(),
       valor = coalesce(valor, (select case when ativo then valor else 0 end from public.indicacao_config where id = 1))
     where indicado_id = new.empresa_id and status = 'aguardando';
+  elsif tg_op = 'UPDATE' and old.status = 'approved' and new.status in ('refunded', 'charged_back') and new.aplicado
+        and not exists (select 1 from public.pagamentos p where p.empresa_id = new.empresa_id and p.id <> new.id and p.aplicado and p.status = 'approved') then
+    -- o pagamento do indicado foi estornado: a recompensa ainda não paga é cancelada; se já foi paga, fica o aviso para o dono
+    update public.indicacoes set status = case when status = 'paga' then status else 'cancelada' end,
+      obs = left(coalesce(obs || ' · ', '') || 'pagamento do indicado ' || case when new.status = 'refunded' then 'estornado' else 'contestado' end || ' em ' || to_char(now(), 'DD/MM/YYYY'), 500)
+    where indicado_id = new.empresa_id and status in ('liberada', 'paga');
   end if;
   return new;
 end $$;
